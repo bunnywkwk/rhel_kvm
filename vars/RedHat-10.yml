@@ -1,0 +1,36 @@
+---
+
+# RHEL 10 - Modular Libvirt Daemon model
+
+kvm_daemon_model: modular
+
+# Modular driver systemd sockets to enabled and start
+kvm_sockets:
+  - virtqemud.socket
+  - virtqemud-ro.socket
+  - virtqemud-admin.socket
+  - virtnetworkd.socket
+  - virtnetworkd-ro.socket
+  - virtnetworkd-admin.socket
+  - virtstoraged.socket
+  - virtstoraged-ro.socket
+  - virtstoraged-admin.socket
+  - virtnodedevd.socket
+  - virtnodedevd-ro.socket
+  - virtnodedevd-admin.socket
+  - virtsecretd.socket
+  - virtsecretd-ro.socket
+  - virtsecretd-admin.socket
+  - virtnwfilterd.socket
+  - virtnwfilterd-ro.socket
+  - virtnwfilterd-admin.socket
+
+# Modular services are on-demand socket activated
+kvm_services: []
+
+# Ensure legacy monolithic service does not conflict
+kvm_disabled_services:
+  - libvirtd.service
+  - libvirtd.socket
+  - libvirtd-ro.socket
+  - libvirtd-admin.socket

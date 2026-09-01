@@ -1,0 +1,66 @@
+---
+# ==============================================================================
+# Pre-flight Checks & Kernel Module Configuration
+# ==============================================================================
+
+# Validates that the target OS is specifically RedHat/EL major version 9 or 10
+- name: Validate target operating system family
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['os_family'] == 'RedHat'
+      - ansible_facts['distribution_major_version'] in ['9', '10']
+    fail_msg: "This role only supports RedHat / RHEL 9 and 10. Detected: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+    success_msg: "Target OS validated: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+
+# Scans /proc/cpuinfo to check if Intel (vmx) or AMD (svm) hardware virtualization is present
+- name: Check CPU hardware virtualization extensions support
+  ansible.builtin.shell:
+    cmd: "grep -E -c '(vmx|svm)' /proc/cpuinfo"
+  register: kvm_cpu_virt_check
+  changed_when: false
+  failed_when: false
+
+# Displays a warning if hardware virtualization is missing (e.g., nested virt disabled in hypervisor)
+- name: Warn if CPU hardware virtualization is missing
+  ansible.builtin.debug:
+    msg: "WARNING: Hardware virtualization (VT-x/AMD-V) is not detected in /proc/cpuinfo. KVM acceleration may fail unless running in software emulation."
+  when: kvm_cpu_virt_check.stdout | int == 0
+
+# Loads core virtualization kernel modules (kvm, vhost_net packet accelerator, and tun driver) into the running kernel
+- name: Load required virtualization kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - kvm
+    - vhost_net
+    - tun
+
+# Writes module names to /etc/modules-load.d/kvm.conf so they persist across host reboots
+- name: Ensure virtualization modules load on boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/kvm.conf
+    content: |
+      # Virtualization kernel modules managed by Ansible
+      kvm
+      vhost_net
+      tun
+    owner: root
+    group: root
+    mode: "0644"
+
+# Enables nested=1 in /etc/modprobe.d/kvm.conf allowing VMs to run nested hypervisors
+- name: Configure nested virtualization modprobe options
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/kvm.conf
+    content: |
+      # Nested virtualization options managed by Ansible
+      options kvm_intel nested=1
+      options kvm_amd nested=1
+    owner: root
+    group: root
+    mode: "0644"
+  when: kvm_enable_nested_virt | bool
+  notify:
+    - Restart libvirtd
+    - Restart virtqemud

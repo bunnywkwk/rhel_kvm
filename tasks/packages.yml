@@ -1,0 +1,11 @@
+---
+# ==============================================================================
+# Package Installation
+# ==============================================================================
+
+# Installs QEMU emulator, Libvirt core daemon, client CLI tools, and image management utilities via DNF
+- name: Install KVM, Libvirt, and management utilities
+  ansible.builtin.dnf:
+    name: "{{ kvm_packages }}"
+    state: present
+    update_cache: true

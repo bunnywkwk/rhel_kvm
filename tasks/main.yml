@@ -1,0 +1,38 @@
+---
+# ==============================================================================
+# rhel_kvm Main Tasks Entrypoint
+# ==============================================================================
+
+# Step 1: Loads RedHat-9.yml or RedHat-10.yml based on OS facts to select the daemon model
+- name: Include OS-specific variables
+  ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}-{{ ansible_facts['distribution_major_version'] }}.yml"
+
+# Step 2: Validates OS, checks CPU hardware virtualization flags, and loads kernel modules
+- name: Run pre-flight hardware and OS validation
+  ansible.builtin.include_tasks: preflight.yml
+
+# Step 3: Installs QEMU, Libvirt, and virtualization management packages via DNF
+- name: Install KVM and virtualization packages
+  ansible.builtin.include_tasks: packages.yml
+
+# Step 4: Configures net.ipv4.ip_forward in sysctl so VMs can route network packets
+- name: Configure kernel sysctl parameters for KVM
+  ansible.builtin.include_tasks: sysctl.yml
+  when: kvm_manage_sysctl | bool
+
+# Step 5: Activates monolithic daemons on RHEL 9 or modular socket units on RHEL 10
+- name: Configure libvirt daemons and socket activation
+  ansible.builtin.include_tasks: daemons.yml
+
+# Step 6: Creates disk directories, applies SELinux virt_image_t, and starts storage pools
+- name: Configure KVM storage pools
+  ansible.builtin.include_tasks: storage.yml
+
+# Step 7: Starts and autostarts the default internal virtual switch (virbr0)
+- name: Configure KVM virtual networks
+  ansible.builtin.include_tasks: networks.yml
+
+# Step 8: Grants non-root users permission to manage VMs by adding them to the libvirt group
+- name: Configure administrative user access
+  ansible.builtin.include_tasks: users.yml
+  when: kvm_admin_users | length > 0

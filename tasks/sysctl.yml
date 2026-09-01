@@ -1,0 +1,26 @@
+---
+# ==============================================================================
+# Sysctl & IP Forwarding Configuration
+# ==============================================================================
+
+# Enables IPv4 packet routing in the Linux kernel so VMs can access external networks via NAT
+- name: Enable IPv4 packet forwarding for virtual networking
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+    sysctl_file: /etc/sysctl.d/99-kvm.conf
+  notify: Reload sysctl
+
+# Enables IPv6 packet routing if IPv6 interfaces are present on the host
+- name: Enable IPv6 packet forwarding (if IPv6 enabled)
+  ansible.posix.sysctl:
+    name: net.ipv6.conf.all.forwarding
+    value: "1"
+    sysctl_set: true
+    state: present
+    reload: true
+    sysctl_file: /etc/sysctl.d/99-kvm.conf
+  when: ansible_facts['all_ipv6_addresses'] is defined and ansible_facts['all_ipv6_addresses'] | length > 0

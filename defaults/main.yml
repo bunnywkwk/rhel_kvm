@@ -1,0 +1,42 @@
+---
+# RHEL KVM DEFAULT VARIABLES
+
+# Enable nested virtualization (VT-x / AMD-V passthrough)
+kvm_enable_nested_virt: true
+
+# manage kernel sysctl parameters (net.ipv4.ip_forward)
+kvm_manage_sysctl: true
+
+# users to add to the libvirt group for non-root management
+kvm_admin_users: []
+
+kvm_packages:
+  - qemu-kvm
+  - libvirt
+  - libvirt-client
+  - virt-install
+  - libguestfs-tools
+  - python3-libvirt
+
+
+# storage pools to provision
+kvm_storage_pools:
+  - name: default
+    path: /var/lib/libvirt/images
+    type: dir
+    autostart: true
+    state: active
+
+# virtual netwoek manament in kvm
+kvm_manage_default_network: true
+kvm_default_network_name: default
+kvm_default_network_autostart: true
+
+
+# Optional: Custom linux bridge connection
+# Example:
+# kvm_custom_bridges:
+#   - name: br0
+#     interface: eth1
+#     ip_forward: true
+kvm_custom_bridges: []

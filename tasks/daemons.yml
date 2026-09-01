@@ -1,0 +1,29 @@
+---
+# Libvirt Daemons & Socket Activation Management
+
+# Disables and masks legacy monolithic libvirtd on RHEL 10 to prevent service conflicts
+- name: Disable conflicting services if applicable
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+    masked: true
+  loop: "{{ kvm_disabled_services | default([]) }}"
+  failed_when: false
+
+# Enables systemd socket activation (libvirtd.socket on RHEL 9 or all 6 driver sockets on RHEL 10)
+- name: Enable and start libvirt systemd sockets
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: "{{ kvm_sockets }}"
+
+# Starts monolithic libvirtd.service on RHEL 9 (automatically skipped on RHEL 10)
+- name: Enable and start libvirt systemd services (Monolithic)
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+  loop: "{{ kvm_services }}"
+  when: kvm_services | length > 0

@@ -1,0 +1,29 @@
+---
+
+galaxy_info:
+  author: "Aeron"
+  description: "Apply kvm on rhel"
+  company: "Aeron - Trainee at AIRNAV"
+  license: MIT
+  role_name: rhel_kvm
+  namespace: ansible-lockdown
+  min_ansible_version: 2.16.1
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+        - "10"
+  galaxy_tags:
+    - kvm
+    - libvirt
+    - virtualization
+    - rhel
+    - hardening
+
+# Collections required by this role
+collections:
+  - ansible.posix
+  - community.general
+  - community.libvirt
+
+dependencies: []

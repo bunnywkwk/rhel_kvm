@@ -1,0 +1,46 @@
+---
+# ==============================================================================
+# Virtual Network & Bridge Configuration
+# ==============================================================================
+
+# Queries virsh to check which virtual network switches are currently configured
+- name: Check existing libvirt networks
+  ansible.builtin.command:
+    cmd: virsh net-list --all --name
+  register: kvm_existing_nets
+  changed_when: false
+
+# Queries current network status and autostart state
+- name: Check default network status
+  ansible.builtin.command:
+    cmd: "virsh net-info {{ kvm_default_network_name }}"
+  register: kvm_net_info
+  changed_when: false
+  when:
+    - kvm_manage_default_network | bool
+    - kvm_default_network_name in kvm_existing_nets.stdout_lines
+
+# Starts the default virtual switch (virbr0) if not currently active
+- name: Start default virtual network
+  ansible.builtin.command:
+    cmd: "virsh net-start {{ kvm_default_network_name }}"
+  when:
+    - kvm_manage_default_network | bool
+    - kvm_default_network_name in kvm_existing_nets.stdout_lines
+    - "'Active:          no' in kvm_net_info.stdout or 'Active: no' in kvm_net_info.stdout"
+  register: kvm_net_start_result
+  changed_when: kvm_net_start_result.rc == 0
+  failed_when: false
+
+# Configures autostart only if autostart is currently 'no'
+- name: Enable autostart on default virtual network
+  ansible.builtin.command:
+    cmd: "virsh net-autostart {{ kvm_default_network_name }}"
+  when:
+    - kvm_manage_default_network | bool
+    - kvm_default_network_name in kvm_existing_nets.stdout_lines
+    - kvm_default_network_autostart | bool
+    - "'Autostart:       no' in kvm_net_info.stdout or 'Autostart: no' in kvm_net_info.stdout"
+  register: kvm_net_autostart_result
+  changed_when: kvm_net_autostart_result.rc == 0
+  failed_when: false
