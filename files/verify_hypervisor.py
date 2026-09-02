@@ -2,7 +2,6 @@
 
 # KVM Hypervisor Acceptance & Compliance Verification
 
-from email.policy import default
 import os
 import sys
 import subprocess
@@ -44,7 +43,7 @@ def check(description, is_pass, detail=""):
         print(msg)
     else:
         failed += 1
-        msg = f" [{RED}FAL{NC}] {description}"
+        msg = f" [{RED}FAIL{NC}] {description}"
         if detail:
             msg += f" (Details: {default})"
         print(msg)

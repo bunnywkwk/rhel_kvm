@@ -27,7 +27,7 @@
     - item.type == 'dir'
 
 # Immediately applies virt_image_t SELinux label to directory so KVM can write VM disk images
-- name: Apply SELinux context to storage pool directory contents
+- name: Apply seLinux context to storage pool directory contents
   ansible.builtin.file:
     path: "{{ item.path }}"
     setype: virt_image_t
@@ -46,21 +46,30 @@
   register: kvm_existing_pools
   changed_when: false
 
+# Defines the storage pool in libvirt if it does not exist yet
+- name: Define libvirt storage pools
+  ansible.builtin.command:
+    cmd: "virsh pool-define-as {{ item.name }} {{ item.type | default('dir') }} --target {{ item.path }}"
+  loop: "{{ kvm_storage_pools }}"
+  when: item.name not in kvm_existing_pools.stdout_lines
+  register: kvm_pool_define_result
+  changed_when: kvm_pool_define_result.rc == 0
+
 # Queries current pool information (active state and autostart state)
 - name: Query existing storage pool info
   ansible.builtin.command:
     cmd: "virsh pool-info {{ item.name }}"
   loop: "{{ kvm_storage_pools }}"
-  when: item.name in kvm_existing_pools.stdout_lines
   register: kvm_pool_info_results
   changed_when: false
 
 # Initializes and builds the storage pool backing structure if required by libvirt
 - name: Build storage pool if not already active
   ansible.builtin.command:
-    cmd: "virsh pool-build {{ item.name }}"
-  loop: "{{ kvm_storage_pools }}"
-  when: item.name in kvm_existing_pools.stdout_lines
+    cmd: "virsh pool-build {{ item.item.name }}"
+  loop: "{{ kvm_pool_info_results.results }}"
+  when:
+    - "'State:          running' not in item.stdout and 'State: running' not in item.stdout"
   register: kvm_pool_build_result
   changed_when: kvm_pool_build_result.rc == 0
   failed_when: false
@@ -71,8 +80,7 @@
     cmd: "virsh pool-start {{ item.item.name }}"
   loop: "{{ kvm_pool_info_results.results }}"
   when:
-    - item.skipped is not defined or not item.skipped
-    - "'Active:          no' in item.stdout or 'Active: no' in item.stdout"
+    - "'State:          running' not in item.stdout and 'State: running' not in item.stdout"
   register: kvm_pool_start_result
   changed_when: kvm_pool_start_result.rc == 0
   failed_when: false
@@ -83,7 +91,6 @@
     cmd: "virsh pool-autostart {{ item.item.name }}"
   loop: "{{ kvm_pool_info_results.results }}"
   when:
-    - item.skipped is not defined or not item.skipped
     - item.item.autostart | default(true) | bool
     - "'Autostart:       no' in item.stdout or 'Autostart: no' in item.stdout"
   register: kvm_pool_autostart_result
