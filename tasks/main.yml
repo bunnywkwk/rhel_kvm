@@ -36,3 +36,14 @@
 - name: Configure administrative user access
   ansible.builtin.include_tasks: users.yml
   when: kvm_admin_users | length > 0
+
+# Step 9: Deploys automated hypervisor verification scripts to /usr/local/bin
+- name: Deploy hypervisor accpetnace verification tools
+  ansible.builtin.copy:
+    src: verify_hypervisor.py
+    dest: /usr/local/bin/verify_hypervisor.py
+    owner: root
+    group: root
+    mode: "0755"
+  when: kvm_deploy_verification_tools | default(true) | bool
+

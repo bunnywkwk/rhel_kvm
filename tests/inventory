@@ -1,2 +1,0 @@
-[kvm_hosts]
-192.168.122.153 ansible_user=root

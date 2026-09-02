@@ -18,7 +18,6 @@ kvm_packages:
   - libguestfs-tools
   - python3-libvirt
 
-
 # storage pools to provision
 kvm_storage_pools:
   - name: default
@@ -32,7 +31,6 @@ kvm_manage_default_network: true
 kvm_default_network_name: default
 kvm_default_network_autostart: true
 
-
 # Optional: Custom linux bridge connection
 # Example:
 # kvm_custom_bridges:
@@ -40,3 +38,6 @@ kvm_default_network_autostart: true
 #     interface: eth1
 #     ip_forward: true
 kvm_custom_bridges: []
+
+# Deploy automated verification script to /usr/local/bin
+kvm_deploy_verification_tools: true

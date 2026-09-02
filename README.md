@@ -48,6 +48,7 @@ Available default variables are defined in [`defaults/main.yml`](defaults/main.y
 | `kvm_manage_default_network` | `true` | Starts and enables autostart for the default `virbr0` virtual switch. |
 | `kvm_default_network_name` | `default` | Name of the default libvirt virtual network. |
 | `kvm_default_network_autostart` | `true` | Whether the default network starts automatically on boot. |
+| `kvm_deploy_verification_tools` | `true` | Deploys `/usr/local/bin/verify_hypervisor.py` for automated compliance checks. |
 
 ---
 
@@ -92,7 +93,25 @@ Available default variables are defined in [`defaults/main.yml`](defaults/main.y
 
 ## 🔍 Verification & Health Checks
 
-After running the role, verify the hypervisor state with the following commands:
+### 1. Automated 1-Click Verification Tool (Recommended)
+This role automatically deploys a standalone Python diagnostic verification script to `/usr/local/bin/verify_hypervisor.py`.
+
+SSH into the hypervisor host and run:
+```bash
+/usr/local/bin/verify_hypervisor.py
+```
+
+This tool automatically validates:
+* **OS Architecture**: Detects RHEL 9 vs RHEL 10.
+* **Daemon Model**: Verifies active `libvirtd` on RHEL 9 or active modular sockets (`virtqemud`, `virtnetworkd`, `virtstoraged`) and masked legacy daemons on RHEL 10.
+* **Storage Pools**: Confirms active storage pools, autostart status, and `virt_image_t` SELinux context.
+* **Virtual Networking**: Checks `virbr0` bridge status and autostart.
+* **Kernel & Routing**: Verifies `net.ipv4.ip_forward = 1` and loaded kernel modules (`kvm`, `vhost_net`, `tun`).
+
+---
+
+### 2. Manual CLI Commands
+Alternatively, you can manually verify individual components:
 
 ```bash
 # 1. Verify Active Sockets / Services
