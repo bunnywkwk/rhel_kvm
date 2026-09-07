@@ -1,7 +1,5 @@
 ---
-# ==============================================================================
 # Storage Pool Provisioning & SELinux Configuration
-# ==============================================================================
 
 # Creates directory paths (like /var/lib/libvirt/images) with restrictive 0711 permissions
 - name: Ensure storage pool directories exist with correct permissions

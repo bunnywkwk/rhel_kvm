@@ -1,7 +1,5 @@
 ---
-# ==============================================================================
 # Sysctl & IP Forwarding Configuration
-# ==============================================================================
 
 # Enables IPv4 packet routing in the Linux kernel so VMs can access external networks via NAT
 - name: Enable IPv4 packet forwarding for virtual networking

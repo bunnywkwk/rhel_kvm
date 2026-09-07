@@ -1,7 +1,5 @@
 ---
-# ==============================================================================
 # Dedicated Hypervisor Bridge Network Configuration
-# ==============================================================================
 
 # Defines, starts, and enables autostart for the dedicated bridge network using native libvirt module
 - name: Define and activate dedicated bridge network

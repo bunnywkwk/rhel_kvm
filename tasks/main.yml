@@ -1,7 +1,5 @@
 ---
-# ==============================================================================
 # rhel_kvm Main Tasks Entrypoint
-# ==============================================================================
 
 # Step 1: Loads RedHat-9.yml or RedHat-10.yml based on OS facts to select the daemon model
 - name: Include OS-specific variables

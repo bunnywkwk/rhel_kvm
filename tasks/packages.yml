@@ -1,7 +1,5 @@
 ---
-# ==============================================================================
 # Package Installation
-# ==============================================================================
 
 # Installs non-negotiable core KVM hypervisor binaries and libraries from vars/main.yml
 - name: Install core KVM hypervisor packages

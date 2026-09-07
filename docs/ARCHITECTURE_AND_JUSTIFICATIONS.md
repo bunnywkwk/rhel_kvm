@@ -135,6 +135,7 @@ In standard Ansible roles, placing the package list in `defaults/main.yml` expos
 - **Justification**:
   - Directory permission `0711` (`drwx--x--x`) prevents unprivileged users from reading VM image files while permitting hypervisor process traversal.
   - Under SELinux `Enforcing`, QEMU cannot read or write to directories labeled with generic `var_t` or `default_t` contexts. Setting `virt_image_t` avoids permission denials.
+  - **Dynamic Storage Path Customization**: Because `/var/lib/libvirt/images` is on the root partition (`/`), administrators frequently redirect VM storage to dedicated RAID/NVMe arrays (e.g. `/data/vms`). Leaving `kvm_storage_pools` in `defaults/main.yml` ensures users can customize paths without touching code, while the role dynamically creates the target folder, registers the SELinux context, and configures Libvirt seamlessly.
   - Using `community.libvirt.virt_pool` replaces shell/command calls with native libvirt API bindings, ensuring strict idempotency (`changed=0` on repeated runs).
 
 [SCREENSHOT: virsh pool-list --all command output showing default storage pool in Active state with Autostart enabled]

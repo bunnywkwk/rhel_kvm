@@ -7,7 +7,6 @@ kvm_manage_sysctl: true
 # users to add to the libvirt group for non-root management
 kvm_admin_users: []
 
-# Optional extra packages to install alongside mandatory core hypervisor packages
 # Users can add custom tools here (e.g. guestfs-tools) without replacing core binaries
 kvm_extra_packages: []
 
@@ -19,7 +18,6 @@ kvm_storage_pools:
     autostart: true
     state: active
 
-# Dedicated KVM Bridge Network Configuration
 # Provisions a dedicated virtual switch for inter-VM and VM-to-host communication
 kvm_manage_bridge_network: true
 kvm_bridge_network_name: "kvm_br0"

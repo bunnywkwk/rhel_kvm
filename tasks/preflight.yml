@@ -1,7 +1,5 @@
 ---
-# ==============================================================================
 # Pre-flight Checks & Kernel Module Configuration
-# ==============================================================================
 
 # Validates that the target OS is specifically RedHat/EL major version 9 or 10
 - name: Validate target operating system family

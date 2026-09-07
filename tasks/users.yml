@@ -1,11 +1,7 @@
 ---
-# ==============================================================================
-# User Management
 # User & Access Management
-# ==============================================================================
 
 # Grants administrative users access to virsh and KVM without requiring sudo
-# Grants specified administrative users access to virsh and KVM without requiring sudo
 - name: Add administrative users to libvirt group
   ansible.builtin.user:
     name: "{{ item }}"
