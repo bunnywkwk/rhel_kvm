@@ -1,1 +1,10 @@
+# Ansible temporary and cache files
 .ansible/
+.ansible_tmp/
+
+
+# Python bytecode and caches
+__pycache__/
+
+# Local logs
+*.log

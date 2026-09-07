@@ -32,13 +32,12 @@
 - name: Configure KVM virtual networks
   ansible.builtin.include_tasks: networks.yml
 
-# Step 8: Grants non-root users permission to manage VMs by adding them to the libvirt group
+# Step 8: Grants non-root users permission to manage VMs and sets default system URI
 - name: Configure administrative user access
   ansible.builtin.include_tasks: users.yml
-  when: kvm_admin_users | length > 0
 
 # Step 9: Deploys automated hypervisor verification scripts to /usr/local/bin
-- name: Deploy hypervisor accpetnace verification tools
+- name: Deploy hypervisor acceptance verification tools
   ansible.builtin.copy:
     src: verify_hypervisor.py
     dest: /usr/local/bin/verify_hypervisor.py
@@ -46,4 +45,3 @@
     group: root
     mode: "0755"
   when: kvm_deploy_verification_tools | default(true) | bool
-

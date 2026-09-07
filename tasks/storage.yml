@@ -27,7 +27,7 @@
     - item.type == 'dir'
 
 # Immediately applies virt_image_t SELinux label to directory so KVM can write VM disk images
-- name: Apply seLinux context to storage pool directory contents
+- name: Apply SELinux context to storage pool directory contents
   ansible.builtin.file:
     path: "{{ item.path }}"
     setype: virt_image_t
@@ -39,60 +39,12 @@
     - ansible_facts['selinux']['status'] == 'enabled'
     - item.type == 'dir'
 
-# Queries virsh to discover which storage pools are already defined on the hypervisor
-- name: Check existing libvirt storage pools
-  ansible.builtin.command:
-    cmd: virsh pool-list --all --name
-  register: kvm_existing_pools
-  changed_when: false
-
-# Defines the storage pool in libvirt if it does not exist yet
-- name: Define libvirt storage pools
-  ansible.builtin.command:
-    cmd: "virsh pool-define-as {{ item.name }} {{ item.type | default('dir') }} --target {{ item.path }}"
+# Defines, builds, and activates libvirt storage pools using native libvirt module
+- name: Define and activate libvirt storage pools
+  community.libvirt.virt_pool:
+    name: "{{ item.name }}"
+    state: active
+    autostart: "{{ item.autostart | default(true) }}"
+    xml: "{{ lookup('ansible.builtin.template', 'storage_pool.xml.j2') }}"
+    uri: "qemu:///system"
   loop: "{{ kvm_storage_pools }}"
-  when: item.name not in kvm_existing_pools.stdout_lines
-  register: kvm_pool_define_result
-  changed_when: kvm_pool_define_result.rc == 0
-
-# Queries current pool information (active state and autostart state)
-- name: Query existing storage pool info
-  ansible.builtin.command:
-    cmd: "virsh pool-info {{ item.name }}"
-  loop: "{{ kvm_storage_pools }}"
-  register: kvm_pool_info_results
-  changed_when: false
-
-# Initializes and builds the storage pool backing structure if required by libvirt
-- name: Build storage pool if not already active
-  ansible.builtin.command:
-    cmd: "virsh pool-build {{ item.item.name }}"
-  loop: "{{ kvm_pool_info_results.results }}"
-  when:
-    - "'State:          running' not in item.stdout and 'State: running' not in item.stdout"
-  register: kvm_pool_build_result
-  changed_when: kvm_pool_build_result.rc == 0
-  failed_when: false
-
-# Activates the storage pool only if it is not currently active
-- name: Start libvirt storage pools
-  ansible.builtin.command:
-    cmd: "virsh pool-start {{ item.item.name }}"
-  loop: "{{ kvm_pool_info_results.results }}"
-  when:
-    - "'State:          running' not in item.stdout and 'State: running' not in item.stdout"
-  register: kvm_pool_start_result
-  changed_when: kvm_pool_start_result.rc == 0
-  failed_when: false
-
-# Sets the storage pool autostart only if it is currently 'no'
-- name: Enable autostart on libvirt storage pools
-  ansible.builtin.command:
-    cmd: "virsh pool-autostart {{ item.item.name }}"
-  loop: "{{ kvm_pool_info_results.results }}"
-  when:
-    - item.item.autostart | default(true) | bool
-    - "'Autostart:       no' in item.stdout or 'Autostart: no' in item.stdout"
-  register: kvm_pool_autostart_result
-  changed_when: kvm_pool_autostart_result.rc == 0
-  failed_when: false

@@ -45,7 +45,7 @@ def check(description, is_pass, detail=""):
         failed += 1
         msg = f" [{RED}FAIL{NC}] {description}"
         if detail:
-            msg += f" (Details: {default})"
+            msg += f" (Details: {detail})"
         print(msg)
 
 
@@ -115,7 +115,7 @@ def main():
         ls_out.split()[3] if rc == 0 and len(ls_out.split()) > 3 else "",
     )
     # 4. Virtual Network & Bridge
-    print(f"\n{BOLD}--- 4. Virtual Networks & Bridge (virbr0) ---{NC}")
+    print(f"\n{BOLD}--- 4. Virtual Networks & Dedicated Bridge ---{NC}")
     rc, net_info = run_cmd("virsh net-info default")
     check("Virtual network 'default' exists", rc == 0)
     if rc == 0:
@@ -123,8 +123,27 @@ def main():
         check(
             "Virtual network 'default' autostart=yes", "yes" in net_info.lower()
         )
+    rc_br, br_info = run_cmd("virsh net-info kvm_br0")
+    check("Dedicated bridge network 'kvm_br0' exists", rc_br == 0)
+    if rc_br == 0:
+        check("Dedicated bridge network 'kvm_br0' active", "yes" in br_info.lower())
+        check("Dedicated bridge network 'kvm_br0' autostart=yes", "yes" in br_info.lower())
     rc, _ = run_cmd("ip link show virbr0")
-    check("Linux bridge interface 'virbr0' exists and UP", rc == 0)
+    check("Linux bridge interface 'virbr0' (default) exists and UP", rc == 0)
+    rc_v1, _ = run_cmd("ip link show virbr1")
+    check("Linux bridge interface 'virbr1' (kvm_br0) exists and UP", rc_v1 == 0)
+
+    # 5. Non-Root Management & Environment
+    print(f"\n{BOLD}--- 5. Non-Root Management & System URI ---{NC}")
+    profile_exists = os.path.exists("/etc/profile.d/libvirt.sh")
+    check("System profile '/etc/profile.d/libvirt.sh' exists", profile_exists)
+    if profile_exists:
+        with open("/etc/profile.d/libvirt.sh") as pf:
+            check(
+                "Default system URI set to qemu:///system",
+                'LIBVIRT_DEFAULT_URI="qemu:///system"' in pf.read(),
+            )
+
     # Summary
     total = passed + failed
     print(
@@ -139,11 +158,11 @@ def main():
     print(f" Failed       : {RED}{failed}{NC}")
     if failed == 0:
         print(
-            f"\n {GREEN}{BOLD}🎉 ALL ACCEPTANCE CRITERIA PASSED! (100%){NC}\n"
+            f"\n {GREEN}{BOLD}[OK] ALL ACCEPTANCE CRITERIA PASSED! (100%){NC}\n"
         )
         sys.exit(0)
     else:
-        print(f"\n {RED}{BOLD}❌ SOME CHECKS FAILED.{NC}\n")
+        print(f"\n {RED}{BOLD}[FAIL] SOME CHECKS FAILED.{NC}\n")
         sys.exit(1)
 if __name__ == "__main__":
     main()

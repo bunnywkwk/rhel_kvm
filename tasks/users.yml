@@ -1,12 +1,29 @@
 ---
 # ==============================================================================
 # User Management
+# User & Access Management
 # ==============================================================================
 
 # Grants administrative users access to virsh and KVM without requiring sudo
+# Grants specified administrative users access to virsh and KVM without requiring sudo
 - name: Add administrative users to libvirt group
   ansible.builtin.user:
     name: "{{ item }}"
     groups: libvirt
     append: true
   loop: "{{ kvm_admin_users }}"
+  when:
+    - kvm_admin_users is defined
+    - kvm_admin_users | length > 0
+
+# Configures system-wide default libvirt URI so users in libvirt group connect to system hypervisor automatically
+- name: Configure system-wide default libvirt URI
+  ansible.builtin.copy:
+    dest: /etc/profile.d/libvirt.sh
+    content: |
+      # Managed by Ansible - rhel_kvm
+      # Routes virsh commands for libvirt group members to the system hypervisor by default
+      export LIBVIRT_DEFAULT_URI="qemu:///system"
+    owner: root
+    group: root
+    mode: "0644"

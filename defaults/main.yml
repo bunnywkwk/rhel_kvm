@@ -1,22 +1,15 @@
 ---
 # RHEL KVM DEFAULT VARIABLES
 
-# Enable nested virtualization (VT-x / AMD-V passthrough)
-kvm_enable_nested_virt: true
-
-# manage kernel sysctl parameters (net.ipv4.ip_forward)
+# Manage kernel sysctl parameters (net.ipv4.ip_forward)
 kvm_manage_sysctl: true
 
 # users to add to the libvirt group for non-root management
 kvm_admin_users: []
 
-kvm_packages:
-  - qemu-kvm
-  - libvirt
-  - libvirt-client
-  - virt-install
-  - libguestfs-tools
-  - python3-libvirt
+# Optional extra packages to install alongside mandatory core hypervisor packages
+# Users can add custom tools here (e.g. guestfs-tools) without replacing core binaries
+kvm_extra_packages: []
 
 # storage pools to provision
 kvm_storage_pools:
@@ -26,18 +19,16 @@ kvm_storage_pools:
     autostart: true
     state: active
 
-# virtual netwoek manament in kvm
-kvm_manage_default_network: true
-kvm_default_network_name: default
-kvm_default_network_autostart: true
-
-# Optional: Custom linux bridge connection
-# Example:
-# kvm_custom_bridges:
-#   - name: br0
-#     interface: eth1
-#     ip_forward: true
-kvm_custom_bridges: []
+# Dedicated KVM Bridge Network Configuration
+# Provisions a dedicated virtual switch for inter-VM and VM-to-host communication
+kvm_manage_bridge_network: true
+kvm_bridge_network_name: "kvm_br0"
+kvm_bridge_device: "virbr1"
+kvm_bridge_ip: "192.168.100.1"
+kvm_bridge_netmask: "255.255.255.0"
+kvm_bridge_dhcp_start: "192.168.100.10"
+kvm_bridge_dhcp_end: "192.168.100.254"
+kvm_bridge_autostart: true
 
 # Deploy automated verification script to /usr/local/bin
 kvm_deploy_verification_tools: true

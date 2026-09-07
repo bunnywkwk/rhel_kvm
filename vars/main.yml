@@ -1,0 +1,14 @@
+---
+# ==============================================================================
+# rhel_kvm - Role Architecture Constants (Protected Variables)
+# ==============================================================================
+
+# Mandatory KVM hypervisor packages
+# Defined in vars/main.yml to lock them down as non-negotiable role constants.
+# In Ansible variable precedence, vars/ prevents accidental overrides from group_vars.
+kvm_packages:
+  - qemu-kvm
+  - libvirt
+  - libvirt-client
+  - virt-install
+  - python3-libvirt

@@ -48,19 +48,3 @@
     owner: root
     group: root
     mode: "0644"
-
-# Enables nested=1 in /etc/modprobe.d/kvm.conf allowing VMs to run nested hypervisors
-- name: Configure nested virtualization modprobe options
-  ansible.builtin.copy:
-    dest: /etc/modprobe.d/kvm.conf
-    content: |
-      # Nested virtualization options managed by Ansible
-      options kvm_intel nested=1
-      options kvm_amd nested=1
-    owner: root
-    group: root
-    mode: "0644"
-  when: kvm_enable_nested_virt | bool
-  notify:
-    - Restart libvirtd
-    - Restart virtqemud

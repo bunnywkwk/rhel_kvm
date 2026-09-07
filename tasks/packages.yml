@@ -3,9 +3,18 @@
 # Package Installation
 # ==============================================================================
 
-# Installs QEMU emulator, Libvirt core daemon, client CLI tools, and image management utilities via DNF
-- name: Install KVM, Libvirt, and management utilities
+# Installs non-negotiable core KVM hypervisor binaries and libraries from vars/main.yml
+- name: Install core KVM hypervisor packages
   ansible.builtin.dnf:
     name: "{{ kvm_packages }}"
     state: present
     update_cache: true
+
+# Installs optional user-defined packages without risking core hypervisor dependencies
+- name: Install optional user-defined KVM packages
+  ansible.builtin.dnf:
+    name: "{{ kvm_extra_packages }}"
+    state: present
+  when:
+    - kvm_extra_packages is defined
+    - kvm_extra_packages | length > 0
