@@ -12,7 +12,7 @@ Detailed architectural justifications, folder structure breakdowns, and verifica
 
 ---
 
-## 🏗️ Architectural Overview & Technical Justifications
+## Architectural Overview & Technical Justifications
 
 ## 1. Architectural Overview and Technical Justifications
 
@@ -44,7 +44,7 @@ Default CIS hardening profiles often conflict with virtualization hypervisors. T
 
 ---
 
-## 📋 Requirements & Collections
+## Requirements & Collections
 
 ## 2. Requirements and Collections
 
@@ -82,7 +82,7 @@ _Note: Mandatory core packages (`qemu-kvm`, `libvirt`, `virt-install`, etc.) are
 
 ---
 
-## 🚀 Example Usage
+## Example Usage
 
 ## 4. Example Usage
 
@@ -129,7 +129,7 @@ _Note: Mandatory core packages (`qemu-kvm`, `libvirt`, `virt-install`, etc.) are
 
 ---
 
-## 🔍 Verification & Health Checks
+## Verification & Health Checks
 
 ## 5. Verification and Health Checks
 
@@ -192,7 +192,7 @@ sysctl net.ipv4.ip_forward
 
 ---
 
-## 📄 License & Author
+## License & Author
 
 ## 6. License and Author
 

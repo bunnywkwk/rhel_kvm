@@ -37,12 +37,20 @@
     - ansible_facts['selinux']['status'] == 'enabled'
     - item.type == 'dir'
 
-# Defines, builds, and activates libvirt storage pools using native libvirt module
-- name: Define and activate libvirt storage pools
+# Defines libvirt storage pools (must be defined before they can be activated)
+- name: Ensure libvirt storage pools are defined
+  community.libvirt.virt_pool:
+    name: "{{ item.name }}"
+    state: present
+    xml: "{{ lookup('ansible.builtin.template', 'storage_pool.xml.j2') }}"
+    uri: "qemu:///system"
+  loop: "{{ kvm_storage_pools }}"
+
+# Activates and sets autostart for the storage pools
+- name: Activate and autostart libvirt storage pools
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
     state: active
     autostart: "{{ item.autostart | default(true) }}"
-    xml: "{{ lookup('ansible.builtin.template', 'storage_pool.xml.j2') }}"
     uri: "qemu:///system"
   loop: "{{ kvm_storage_pools }}"

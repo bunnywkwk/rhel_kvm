@@ -1,5 +1,4 @@
 ---
-
 # RHEL 10 - Modular Libvirt Daemon model
 
 kvm_daemon_model: modular
@@ -25,8 +24,11 @@ kvm_sockets:
   - virtnwfilterd-ro.socket
   - virtnwfilterd-admin.socket
 
-# Modular services are on-demand socket activated
-kvm_services: []
+# Modular services MUST be enabled for autostart features (VMs, Networks, Pools) to work on boot
+kvm_services:
+  - virtqemud.service
+  - virtnetworkd.service
+  - virtstoraged.service
 
 # Ensure legacy monolithic service does not conflict
 kvm_disabled_services:

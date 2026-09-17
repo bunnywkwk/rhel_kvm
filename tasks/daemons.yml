@@ -19,8 +19,8 @@
     state: started
   loop: "{{ kvm_sockets }}"
 
-# Starts monolithic libvirtd.service on RHEL 9 (automatically skipped on RHEL 10)
-- name: Enable and start libvirt systemd services (Monolithic)
+# Starts systemd services to ensure autostart configurations trigger on boot
+- name: Enable and start libvirt systemd services
   ansible.builtin.systemd_service:
     name: "{{ item }}"
     enabled: true

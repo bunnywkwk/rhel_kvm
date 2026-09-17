@@ -1,6 +1,6 @@
 # rhel_kvm - Role Goals & Progress Checklist
 
-## 🎯 Role Mission
+## Role Mission
 Provision a bare RHEL 9 or RHEL 10 server into a production-grade KVM Hypervisor Host with:
 * Dynamic detection of **Monolithic Libvirt (RHEL 9)** vs **Modular Libvirt (RHEL 10)** via a 3-step variable decision chain.
 * Automated storage pool provisioning with SELinux `virt_image_t` context.
@@ -9,7 +9,7 @@ Provision a bare RHEL 9 or RHEL 10 server into a production-grade KVM Hypervisor
 
 ---
 
-## 📋 Role Checklist
+## Role Checklist
 
 ### Step 1: Metadata, Defaults & OS Variables (Completed)
 - [x] **`meta/main.yml`**: Galaxy metadata, EL 9 & 10 platform support, collection requirements (`ansible.posix`, `community.general`, `community.libvirt`).
@@ -44,7 +44,7 @@ Provision a bare RHEL 9 or RHEL 10 server into a production-grade KVM Hypervisor
 
 ---
 
-## ⚡ Task-by-Task One-Liner Quick Guide
+## Task-by-Task One-Liner Quick Guide
 
 | Task File | What each task does |
 | :--- | :--- |

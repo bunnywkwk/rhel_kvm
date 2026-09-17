@@ -4,7 +4,7 @@ This document contains the core technical questions, architecture decisions, net
 
 ---
 
-## ❓ Q&A Reference
+## Q&A Reference
 
 ### Q1: What does "Take a bare RHEL 9 or RHEL 10 machine to a hardened KVM host" mean?
 

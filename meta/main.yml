@@ -1,13 +1,14 @@
 ---
+# rhel_kvm - Ansible Galaxy Role Metadata
 
 galaxy_info:
   author: "Aeron"
-  description: "Apply kvm on rhel"
+  description: "Enterprise KVM Hypervisor provisioning role supporting Monolithic (EL9) and Modular (EL10) Libvirt"
   company: "Aeron - Trainee at AIRNAV"
   license: MIT
   role_name: rhel_kvm
   namespace: ansible-lockdown
-  min_ansible_version: 2.16.1
+  min_ansible_version: "2.16.1"
   platforms:
     - name: EL
       versions:
@@ -18,8 +19,10 @@ galaxy_info:
     - libvirt
     - virtualization
     - rhel
+    - hypervisor
+    - security
 
-# Collections required by this role
+# Collections required by this role (must be list of strings in meta/main.yml)
 collections:
   - ansible.posix
   - community.general
