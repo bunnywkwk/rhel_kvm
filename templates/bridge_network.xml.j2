@@ -1,10 +1,10 @@
 <network>
-  <name>{{ kvm_bridge_network_name }}</name>
+  <name>{{ rhel_kvm_bridge_network_name }}</name>
   <forward mode='nat'/>
-  <bridge name='{{ kvm_bridge_device }}' stp='on' delay='0'/>
-  <ip address='{{ kvm_bridge_ip }}' netmask='{{ kvm_bridge_netmask }}'>
+  <bridge name='{{ rhel_kvm_bridge_device }}' stp='on' delay='0'/>
+  <ip address='{{ rhel_kvm_bridge_ip }}' netmask='{{ rhel_kvm_bridge_netmask }}'>
     <dhcp>
-      <range start='{{ kvm_bridge_dhcp_start }}' end='{{ kvm_bridge_dhcp_end }}'/>
+      <range start='{{ rhel_kvm_bridge_dhcp_start }}' end='{{ rhel_kvm_bridge_dhcp_end }}'/>
     </dhcp>
   </ip>
 </network>

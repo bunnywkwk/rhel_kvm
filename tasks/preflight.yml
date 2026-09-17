@@ -14,7 +14,7 @@
 - name: Check CPU hardware virtualization extensions support
   ansible.builtin.shell:
     cmd: "grep -E -c '(vmx|svm)' /proc/cpuinfo"
-  register: kvm_cpu_virt_check
+  register: rhel_kvm_cpu_virt_check
   changed_when: false
   failed_when: false
 
@@ -22,7 +22,7 @@
 - name: Warn if CPU hardware virtualization is missing
   ansible.builtin.debug:
     msg: "WARNING: Hardware virtualization (VT-x/AMD-V) is not detected in /proc/cpuinfo. KVM acceleration may fail unless running in software emulation."
-  when: kvm_cpu_virt_check.stdout | int == 0
+  when: rhel_kvm_cpu_virt_check.stdout | int == 0
 
 # Loads core virtualization kernel modules (kvm, vhost_net packet accelerator, and tun driver) into the running kernel
 - name: Load required virtualization kernel modules

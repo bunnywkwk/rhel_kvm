@@ -56,13 +56,13 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 ```
 
 - **If RHEL 9**: It reads `vars/RedHat-9.yml` and loads:
-  - `kvm_sockets`: `[libvirtd.socket, libvirtd-ro.socket, libvirtd-admin.socket]`
-  - `kvm_services`: `[libvirtd.service]`
-  - `kvm_disabled_services`: `[]`
+  - `rhel_kvm_sockets`: `[libvirtd.socket, libvirtd-ro.socket, libvirtd-admin.socket]`
+  - `rhel_kvm_services`: `[libvirtd.service]`
+  - `rhel_kvm_disabled_services`: `[]`
 - **If RHEL 10**: It reads `vars/RedHat-10.yml` and loads:
-  - `kvm_sockets`: `[virtqemud.socket, virtnetworkd.socket, virtstoraged.socket, ...]`
-  - `kvm_services`: `[]`
-  - `kvm_disabled_services`: `[libvirtd.service, libvirtd.socket, ...]`
+  - `rhel_kvm_sockets`: `[virtqemud.socket, virtnetworkd.socket, virtstoraged.socket, ...]`
+  - `rhel_kvm_services`: `[]`
+  - `rhel_kvm_disabled_services`: `[libvirtd.service, libvirtd.socket, ...]`
 
 #### Step 3: Clean Execution in `tasks/daemons.yml`
 
@@ -77,11 +77,11 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
        enabled: false
        state: stopped
        masked: true
-     loop: "{{ kvm_disabled_services | default([]) }}"
+     loop: "{{ rhel_kvm_disabled_services | default([]) }}"
      failed_when: false
    ```
 
-   - _On RHEL 9_: `kvm_disabled_services` is empty `[]` → nothing is disabled.
+   - _On RHEL 9_: `rhel_kvm_disabled_services` is empty `[]` → nothing is disabled.
    - _On RHEL 10_: It actively disables and masks legacy `libvirtd` units so they can never interfere.
 
 2. **Starting the appropriate Sockets**:
@@ -92,7 +92,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
        name: "{{ item }}"
        enabled: true
        state: started
-     loop: "{{ kvm_sockets }}"
+     loop: "{{ rhel_kvm_sockets }}"
    ```
 
    - _On RHEL 9_: Starts `libvirtd.socket` units.
@@ -105,12 +105,12 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
        name: "{{ item }}"
        enabled: true
        state: started
-     loop: "{{ kvm_services }}"
-     when: kvm_services | length > 0
+     loop: "{{ rhel_kvm_services }}"
+     when: rhel_kvm_services | length > 0
    ```
 
-   - _On RHEL 9_: `kvm_services` has `[libvirtd.service]` → starts the monolithic service.
-   - _On RHEL 10_: `kvm_services` is `[]` (empty) → Ansible automatically skips this task cleanly.
+   - _On RHEL 9_: `rhel_kvm_services` has `[libvirtd.service]` → starts the monolithic service.
+   - _On RHEL 10_: `rhel_kvm_services` is `[]` (empty) → Ansible automatically skips this task cleanly.
 
 ---
 
@@ -177,7 +177,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
     - **Require `import_tasks`** so that `--tags rule_1.1.1` and `--skip-tags` work from the CLI, `--list-tasks` outputs the complete auditor rule inventory, and `--start-at-task` can resume failed runs.
   - **`rhel_kvm` Provisioning Role**:
     - Has an 8-step sequential infrastructure pipeline.
-    - **Uses `include_tasks`** because features like `sysctl.yml` and `users.yml` are conditionally toggled (`when: kvm_manage_sysctl | bool`). `include_tasks` allows skipping entire disabled feature files in 1 quick step at runtime instead of outputting 10 noisy skipped task lines.
+    - **Uses `include_tasks`** because features like `sysctl.yml` and `users.yml` are conditionally toggled (`when: rhel_kvm_manage_sysctl | bool`). `include_tasks` allows skipping entire disabled feature files in 1 quick step at runtime instead of outputting 10 noisy skipped task lines.
 
 ---
 
@@ -185,7 +185,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 
 - **A**:
   1. **Runtime "Lazy Loading"**: It is evaluated only when execution reaches that line, ensuring it uses the freshest runtime facts and registered variables.
-  2. **Single-Step Feature Skipping**: When a condition like `when: kvm_manage_sysctl | bool` is `false`, Ansible evaluates it once on the `include_tasks` statement and skips the whole file in 1 millisecond.
+  2. **Single-Step Feature Skipping**: When a condition like `when: rhel_kvm_manage_sysctl | bool` is `false`, Ansible evaluates it once on the `include_tasks` statement and skips the whole file in 1 millisecond.
   3. **Clean Execution Logs**: Keeps the terminal output concise and professional for infrastructure provisioning.
 
 ---
@@ -223,7 +223,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 
 ---
 
-### Q12: What packages technically can a user add under `kvm_extra_packages` on KVM?
+### Q12: What packages technically can a user add under `rhel_kvm_extra_packages` on KVM?
 
 - **A**: Real-world enterprise packages and their justifications:
   1. **`libguestfs-tools` / `guestfs-tools`**: Offline disk image manipulation utilities (`virt-customize` to inject SSH keys into images, `virt-sysprep` to reset golden templates, and `guestfish`).
@@ -262,7 +262,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 
 - **A**:
   - In Ansible's role engine, **`vars/main.yml` is automatically loaded into memory** the moment the role starts.
-  - If renamed to `vars/kvm.yml`, Ansible will ignore it. Any task referencing `{{ kvm_packages }}` will fail with an undefined variable error unless an explicit `ansible.builtin.include_vars: kvm.yml` task is added to `tasks/main.yml`.
+  - If renamed to `vars/kvm.yml`, Ansible will ignore it. Any task referencing `{{ rhel_kvm_packages }}` will fail with an undefined variable error unless an explicit `ansible.builtin.include_vars: kvm.yml` task is added to `tasks/main.yml`.
   - Keeping it named `vars/main.yml` conforms to standard Ansible role architecture.
 
 ---

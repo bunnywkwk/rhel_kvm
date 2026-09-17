@@ -9,7 +9,7 @@
     owner: root
     group: root
     mode: "0711"
-  loop: "{{ kvm_storage_pools }}"
+  loop: "{{ rhel_kvm_storage_pools }}"
   when: item.type == 'dir'
 
 # Registers virt_image_t SELinux label in the system database for persistence across filesystem relabels
@@ -18,7 +18,7 @@
     target: "{{ item.path }}(/.*)?"
     setype: virt_image_t
     state: present
-  loop: "{{ kvm_storage_pools }}"
+  loop: "{{ rhel_kvm_storage_pools }}"
   when:
     - ansible_facts['selinux'] is defined
     - ansible_facts['selinux']['status'] == 'enabled'
@@ -31,7 +31,7 @@
     setype: virt_image_t
     recurse: false
     state: directory
-  loop: "{{ kvm_storage_pools }}"
+  loop: "{{ rhel_kvm_storage_pools }}"
   when:
     - ansible_facts['selinux'] is defined
     - ansible_facts['selinux']['status'] == 'enabled'
@@ -44,7 +44,7 @@
     state: present
     xml: "{{ lookup('ansible.builtin.template', 'storage_pool.xml.j2') }}"
     uri: "qemu:///system"
-  loop: "{{ kvm_storage_pools }}"
+  loop: "{{ rhel_kvm_storage_pools }}"
 
 # Activates and sets autostart for the storage pools
 - name: Activate and autostart libvirt storage pools
@@ -53,4 +53,4 @@
     state: active
     autostart: "{{ item.autostart | default(true) }}"
     uri: "qemu:///system"
-  loop: "{{ kvm_storage_pools }}"
+  loop: "{{ rhel_kvm_storage_pools }}"

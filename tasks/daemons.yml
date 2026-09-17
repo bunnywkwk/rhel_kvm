@@ -8,7 +8,7 @@
     enabled: false
     state: stopped
     masked: true
-  loop: "{{ kvm_disabled_services | default([]) }}"
+  loop: "{{ rhel_kvm_disabled_services | default([]) }}"
   failed_when: false
 
 # Enables systemd socket activation (libvirtd.socket on RHEL 9 or all 6 driver sockets on RHEL 10)
@@ -17,7 +17,7 @@
     name: "{{ item }}"
     enabled: true
     state: started
-  loop: "{{ kvm_sockets }}"
+  loop: "{{ rhel_kvm_sockets }}"
 
 # Starts systemd services to ensure autostart configurations trigger on boot
 - name: Enable and start libvirt systemd services
@@ -25,5 +25,5 @@
     name: "{{ item }}"
     enabled: true
     state: started
-  loop: "{{ kvm_services }}"
-  when: kvm_services | length > 0
+  loop: "{{ rhel_kvm_services }}"
+  when: rhel_kvm_services | length > 0

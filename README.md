@@ -67,15 +67,15 @@ Available default variables are defined in [defaults/main.yml](defaults/main.yml
 
 | Variable                        | Default         | Description                                                                    |
 | :------------------------------ | :-------------- | :----------------------------------------------------------------------------- |
-| `kvm_manage_sysctl`             | `true`          | Configures `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/99-kvm.conf`.           |
-| `kvm_admin_users`               | `[]`            | List of user accounts to add to the `libvirt` group for non-root management.   |
-| `kvm_extra_packages`            | `[]`            | Optional extra user packages to install alongside core hypervisor packages.    |
-| `kvm_storage_pools`             | _(List)_        | List of storage pools to provision (defaults to `/var/lib/libvirt/images`).    |
-| `kvm_manage_bridge_network`     | `true`          | Whether to provision the dedicated hypervisor bridge network.                  |
-| `kvm_bridge_network_name`       | `kvm_br0`       | Name of the dedicated virtual bridge network in libvirt.                       |
-| `kvm_bridge_device`             | `virbr1`        | Linux bridge interface name for the dedicated virtual switch.                  |
-| `kvm_bridge_ip`                 | `192.168.100.1` | Gateway IP address assigned to the hypervisor on the bridge.                   |
-| `kvm_bridge_autostart`          | `true`          | Whether the dedicated bridge starts automatically on boot.                     |
+| `rhel_kvm_manage_sysctl`             | `true`          | Configures `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/99-kvm.conf`.           |
+| `rhel_kvm_admin_users`               | `[]`            | List of user accounts to add to the `libvirt` group for non-root management.   |
+| `rhel_kvm_extra_packages`            | `[]`            | Optional extra user packages to install alongside core hypervisor packages.    |
+| `rhel_kvm_storage_pools`             | _(List)_        | List of storage pools to provision (defaults to `/var/lib/libvirt/images`).    |
+| `rhel_kvm_manage_bridge_network`     | `true`          | Whether to provision the dedicated hypervisor bridge network.                  |
+| `rhel_kvm_bridge_network_name`       | `kvm_br0`       | Name of the dedicated virtual bridge network in libvirt.                       |
+| `rhel_kvm_bridge_device`             | `virbr1`        | Linux bridge interface name for the dedicated virtual switch.                  |
+| `rhel_kvm_bridge_ip`                 | `192.168.100.1` | Gateway IP address assigned to the hypervisor on the bridge.                   |
+| `rhel_kvm_bridge_autostart`          | `true`          | Whether the dedicated bridge starts automatically on boot.                     |
 | `kvm_deploy_verification_tools` | `true`          | Deploys `/usr/local/bin/verify_hypervisor.py` for automated compliance checks. |
 
 _Note: Mandatory core packages (`qemu-kvm`, `libvirt`, `virt-install`, etc.) are defined in `vars/main.yml` as protected role constants to prevent accidental omission._
@@ -107,12 +107,12 @@ _Note: Mandatory core packages (`qemu-kvm`, `libvirt`, `virt-install`, etc.) are
   hosts: hypervisors
   become: true
   vars:
-    kvm_admin_users:
+    rhel_kvm_admin_users:
       - sysadmin
       - bunny
-    kvm_extra_packages:
+    rhel_kvm_extra_packages:
       - guestfs-tools
-    kvm_storage_pools:
+    rhel_kvm_storage_pools:
       - name: default
         path: /var/lib/libvirt/images
         type: dir

@@ -3,18 +3,18 @@
 # Rhel 9 - Monolithic Libvirt Daemon model
 
 # kvm daemon set for rhel 9 (monolithic)
-kvm_daemon_model: monolithic
+rhel_kvm_daemon_model: monolithic
 
 
 # Monolithic systemd sockets to enabled and start
-kvm_sockets:
+rhel_kvm_sockets:
   - libvirtd.socket
   - libvirtd-ro.socket
   - libvirtd-admin.socket
 
 # Monolithic service
-kvm_services:
+rhel_kvm_services:
   - libvirtd.service
 
 # Modular sockets to disable/mask (not used on RHEL 9 monolithic)
-kvm_disabled_sockets: []
+rhel_kvm_disabled_sockets: []

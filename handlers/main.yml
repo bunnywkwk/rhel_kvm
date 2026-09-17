@@ -11,14 +11,14 @@
   ansible.builtin.systemd_service:
     name: libvirtd.service
     state: restarted
-  when: kvm_daemon_model == 'monolithic'
+  when: rhel_kvm_daemon_model == 'monolithic'
 
 # Restart modular QEMU driver service on RHEL 10
 - name: Restart virtqemud
   ansible.builtin.systemd_service:
     name: virtqemud.service
     state: restarted
-  when: kvm_daemon_model == 'modular'
+  when: rhel_kvm_daemon_model == 'modular'
 
 # Reload all kernet sysctl setting from /etc/sysctl.d/
 - name: Reload sysctl

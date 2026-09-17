@@ -16,7 +16,7 @@
 # Step 4: Configures net.ipv4.ip_forward in sysctl so VMs can route network packets
 - name: Configure kernel sysctl parameters for KVM
   ansible.builtin.include_tasks: sysctl.yml
-  when: kvm_manage_sysctl | bool
+  when: rhel_kvm_manage_sysctl | bool
 
 # Step 5: Activates monolithic daemons on RHEL 9 or modular socket units on RHEL 10
 - name: Configure libvirt daemons and socket activation

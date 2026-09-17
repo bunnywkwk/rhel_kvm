@@ -4,15 +4,15 @@
 # Installs non-negotiable core KVM hypervisor binaries and libraries from vars/main.yml
 - name: Install core KVM hypervisor packages
   ansible.builtin.dnf:
-    name: "{{ kvm_packages }}"
+    name: "{{ rhel_kvm_packages }}"
     state: present
     update_cache: true
 
 # Installs optional user-defined packages without risking core hypervisor dependencies
 - name: Install optional user-defined KVM packages
   ansible.builtin.dnf:
-    name: "{{ kvm_extra_packages }}"
+    name: "{{ rhel_kvm_extra_packages }}"
     state: present
   when:
-    - kvm_extra_packages is defined
-    - kvm_extra_packages | length > 0
+    - rhel_kvm_extra_packages is defined
+    - rhel_kvm_extra_packages | length > 0

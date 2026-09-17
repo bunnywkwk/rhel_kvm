@@ -51,7 +51,7 @@ rhel_kvm/
 | Directory   | Purpose                           | Technical Justification                                                                                                                                |
 | :---------- | :-------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `meta/`     | Role metadata and dependencies    | Defines supported OS versions and collection requirements (`ansible.posix`, `community.general`, `community.libvirt`). Required for Galaxy compliance. |
-| `defaults/` | Overridable user variables        | Lowest precedence. Contains settings intended for user customization (e.g. `kvm_extra_packages`, storage paths, admin user list).                      |
+| `defaults/` | Overridable user variables        | Lowest precedence. Contains settings intended for user customization (e.g. `rhel_kvm_extra_packages`, storage paths, admin user list).                      |
 | `vars/`     | Protected architectural constants | High precedence. Stores OS-specific daemon mappings and mandatory core packages. Users cannot accidentally overwrite these from `group_vars`.          |
 | `tasks/`    | Sequential task execution         | Broken into modular sub-task files rather than a monolithic script. Allows isolated maintenance and conditional execution.                             |
 | `handlers/` | Event-driven notifications        | Flushes service restarts and sysctl reloads only when state has physically changed, preserving idempotency.                                            |
@@ -64,7 +64,7 @@ rhel_kvm/
 
 ### The Problem: The List Replacement Trap
 
-In standard Ansible roles, placing the package list in `defaults/main.yml` exposes a critical flaw. If a user defines `kvm_packages: [guestfs-tools]` in their inventory `group_vars`, Ansible completely replaces the default list. Consequently, `qemu-kvm`, `libvirt`, and `virt-install` are omitted, breaking the hypervisor.
+In standard Ansible roles, placing the package list in `defaults/main.yml` exposes a critical flaw. If a user defines `rhel_kvm_packages: [guestfs-tools]` in their inventory `group_vars`, Ansible completely replaces the default list. Consequently, `qemu-kvm`, `libvirt`, and `virt-install` are omitted, breaking the hypervisor.
 
 ### The Solution: Two-Tier Package Strategy
 
@@ -77,7 +77,7 @@ In standard Ansible roles, placing the package list in `defaults/main.yml` expos
    - `python3-libvirt`: Python bindings required by Ansible `community.libvirt` modules.
 
 2. **`defaults/main.yml` (Optional User Packages)**:
-   Exposes `kvm_extra_packages: []`. Users can add any extra utility without risking the core platform.
+   Exposes `rhel_kvm_extra_packages: []`. Users can add any extra utility without risking the core platform.
 
 [SCREENSHOT: Terminal output of dnf package installation task executing with zero package omissions]
 
@@ -101,7 +101,7 @@ In standard Ansible roles, placing the package list in `defaults/main.yml` expos
 
 ### Step 2: `tasks/packages.yml` (Package Installation)
 
-- **What it does**: Installs core packages from `kvm_core_packages` and optional packages from `kvm_extra_packages`.
+- **What it does**: Installs core packages from `kvm_core_packages` and optional packages from `rhel_kvm_extra_packages`.
 - **Justification**: Separates mandatory binaries from user additions, ensuring fail-safe package deployment.
 
 ---
@@ -135,7 +135,7 @@ In standard Ansible roles, placing the package list in `defaults/main.yml` expos
 - **Justification**:
   - Directory permission `0711` (`drwx--x--x`) prevents unprivileged users from reading VM image files while permitting hypervisor process traversal.
   - Under SELinux `Enforcing`, QEMU cannot read or write to directories labeled with generic `var_t` or `default_t` contexts. Setting `virt_image_t` avoids permission denials.
-  - **Dynamic Storage Path Customization**: Because `/var/lib/libvirt/images` is on the root partition (`/`), administrators frequently redirect VM storage to dedicated RAID/NVMe arrays (e.g. `/data/vms`). Leaving `kvm_storage_pools` in `defaults/main.yml` ensures users can customize paths without touching code, while the role dynamically creates the target folder, registers the SELinux context, and configures Libvirt seamlessly.
+  - **Dynamic Storage Path Customization**: Because `/var/lib/libvirt/images` is on the root partition (`/`), administrators frequently redirect VM storage to dedicated RAID/NVMe arrays (e.g. `/data/vms`). Leaving `rhel_kvm_storage_pools` in `defaults/main.yml` ensures users can customize paths without touching code, while the role dynamically creates the target folder, registers the SELinux context, and configures Libvirt seamlessly.
   - Using `community.libvirt.virt_pool` replaces shell/command calls with native libvirt API bindings, ensuring strict idempotency (`changed=0` on repeated runs).
 
 [SCREENSHOT: virsh pool-list --all command output showing default storage pool in Active state with Autostart enabled]
@@ -162,7 +162,7 @@ In standard Ansible roles, placing the package list in `defaults/main.yml` expos
 ### Step 7: `tasks/users.yml` (User Access and Global System URI)
 
 - **What it does**:
-  1. Adds users defined in `kvm_admin_users` to the `libvirt` group with `append: true`.
+  1. Adds users defined in `rhel_kvm_admin_users` to the `libvirt` group with `append: true`.
   2. Deploys `/etc/profile.d/libvirt.sh` containing `export LIBVIRT_DEFAULT_URI="qemu:///system"`.
 - **Justification**:
   - The libvirt socket (`/run/libvirt/libvirt-sock`) is owned by group `libvirt` (mode `0660`). Membership in this group grants VM management permissions without requiring root or `sudo`.
@@ -246,7 +246,7 @@ This section documents the specific architectural improvements implemented based
 ### 1. Two-Tier Package Architecture (Eliminating the List Replacement Trap)
 
 - **Mentor Feedback**: Storing core packages in `defaults/main.yml` exposes a vulnerability where a user defining extra packages in `group_vars` replaces the entire list, omitting `qemu-kvm` and breaking the role.
-- **Implementation**: Moved non-negotiable core binaries (`qemu-kvm`, `libvirt`, `virt-install`, `python3-libvirt`) to `vars/main.yml` as protected role constants. Exposed `kvm_extra_packages: []` in `defaults/main.yml` for optional user utilities. Updated `tasks/packages.yml` to install core packages unconditionally, followed by extra packages only if defined.
+- **Implementation**: Moved non-negotiable core binaries (`qemu-kvm`, `libvirt`, `virt-install`, `python3-libvirt`) to `vars/main.yml` as protected role constants. Exposed `rhel_kvm_extra_packages: []` in `defaults/main.yml` for optional user utilities. Updated `tasks/packages.yml` to install core packages unconditionally, followed by extra packages only if defined.
 
 ### 2. Global Libvirt System URI Configuration
 
@@ -276,4 +276,4 @@ This section documents the specific architectural improvements implemented based
 ### 6. Lean Core Hypervisor Packaging
 
 - **Technical Observation**: `libguestfs-tools` pulls in over 200 MB of dependencies and is not required for core hypervisor daemon execution or guest provisioning.
-- **Implementation**: Streamlined `kvm_core_packages` in `vars/main.yml` strictly to the essential hypervisor engine (`qemu-kvm`, `libvirt`, `libvirt-client`, `virt-install`, `python3-libvirt`). Any non-critical image inspection tools can be added via `kvm_extra_packages: []` in `defaults/main.yml`.
+- **Implementation**: Streamlined `kvm_core_packages` in `vars/main.yml` strictly to the essential hypervisor engine (`qemu-kvm`, `libvirt`, `libvirt-client`, `virt-install`, `python3-libvirt`). Any non-critical image inspection tools can be added via `rhel_kvm_extra_packages: []` in `defaults/main.yml`.
