@@ -46,11 +46,22 @@
     uri: "{{ rhel_kvm_libvirt_uri }}"
   loop: "{{ rhel_kvm_storage_pools }}"
 
-# Activates and sets autostart for the storage pools
-- name: Activate and autostart libvirt storage pools
+# Activates the storage pools
+- name: Activate libvirt storage pools
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
     state: active
+    uri: "{{ rhel_kvm_libvirt_uri }}"
+  loop: "{{ rhel_kvm_storage_pools }}"
+
+# Sets autostart for the storage pools.
+# Split from the task above: community.libvirt.virt_pool returns as soon as it
+# handles `state`, so passing `autostart` in the same task is silently ignored
+# and the pool does not come back up on reboot. See:
+# https://github.com/ansible-collections/community.libvirt/blob/main/plugins/modules/virt_pool.py
+- name: Autostart libvirt storage pools
+  community.libvirt.virt_pool:
+    name: "{{ item.name }}"
     autostart: "{{ item.autostart | default(true) }}"
     uri: "{{ rhel_kvm_libvirt_uri }}"
   loop: "{{ rhel_kvm_storage_pools }}"

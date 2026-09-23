@@ -10,11 +10,22 @@
     uri: "{{ rhel_kvm_libvirt_uri }}"
   when: rhel_kvm_manage_bridge_network | bool
 
-# Activates and sets autostart for the dedicated bridge network
-- name: Activate and autostart dedicated bridge network
+# Activates the dedicated bridge network
+- name: Activate dedicated bridge network
   community.libvirt.virt_net:
     name: "{{ rhel_kvm_bridge_network_name }}"
     state: active
+    uri: "{{ rhel_kvm_libvirt_uri }}"
+  when: rhel_kvm_manage_bridge_network | bool
+
+# Sets autostart for the dedicated bridge network.
+# Split from the task above: community.libvirt.virt_net returns as soon as it
+# handles `state`, so passing `autostart` in the same task is silently ignored
+# and the network does not come back up on reboot. See:
+# https://github.com/ansible-collections/community.libvirt/blob/main/plugins/modules/virt_net.py
+- name: Autostart dedicated bridge network
+  community.libvirt.virt_net:
+    name: "{{ rhel_kvm_bridge_network_name }}"
     autostart: "{{ rhel_kvm_bridge_autostart | default(true) }}"
     uri: "{{ rhel_kvm_libvirt_uri }}"
   when: rhel_kvm_manage_bridge_network | bool
