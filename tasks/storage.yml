@@ -43,7 +43,7 @@
     name: "{{ item.name }}"
     state: present
     xml: "{{ lookup('ansible.builtin.template', 'storage_pool.xml.j2') }}"
-    uri: "qemu:///system"
+    uri: "{{ rhel_kvm_libvirt_uri }}"
   loop: "{{ rhel_kvm_storage_pools }}"
 
 # Activates and sets autostart for the storage pools
@@ -52,5 +52,5 @@
     name: "{{ item.name }}"
     state: active
     autostart: "{{ item.autostart | default(true) }}"
-    uri: "qemu:///system"
+    uri: "{{ rhel_kvm_libvirt_uri }}"
   loop: "{{ rhel_kvm_storage_pools }}"

@@ -14,8 +14,8 @@ Provision a bare RHEL 9 or RHEL 10 server into a production-grade KVM Hypervisor
 ### Step 1: Metadata, Defaults & OS Variables (Completed)
 - [x] **`meta/main.yml`**: Galaxy metadata, EL 9 & 10 platform support, collection requirements (`ansible.posix`, `community.general`, `community.libvirt`).
 - [x] **`defaults/main.yml`**: Configurable defaults for packages, nested virt, storage pools, sysctl, and users.
-- [x] **`vars/RedHat-9.yml`**: Monolithic libvirt services (`libvirtd.service`) and sockets (`libvirtd.socket`).
-- [x] **`vars/RedHat-10.yml`**: Modular libvirt driver sockets (`virtqemud`, `virtnetworkd`, `virtstoraged`, etc.) and mask configuration for monolithic units.
+- [x] **`vars/RedHat-9.yml`**: Monolithic libvirt services (`libvirtd.service`) and sockets (`libvirtd.socket`), mask configuration for the modular driver units (`virtqemud`, `virtnetworkd`, `virtstoraged`, `virtnodedevd`, `virtsecretd`, `virtnwfilterd`), and `rhel_kvm_libvirt_uri` pinned to `libvirtd`'s explicit socket path — required after field testing showed the libvirt client defaults to the modular sockets on RHEL 9.8 regardless of systemd state (see `docs/LESSONS_LEARNED_AND_FIXES.md` #6/#7).
+- [x] **`vars/RedHat-10.yml`**: Modular libvirt driver sockets (`virtqemud`, `virtnetworkd`, `virtstoraged`, etc.), mask configuration for monolithic units, and `rhel_kvm_libvirt_uri` set to plain `qemu:///system`.
 
 ---
 

@@ -1,12 +1,30 @@
 ---
 
-# Rhel 9 - Monolithic Libvirt Daemon model
-
-# kvm daemon set for rhel 9 (monolithic)
+# Rhel 9 - Monolithic Libvirt Daemon model (REQUIRED — do not change to modular)
+#
+# RHEL 9 must run monolithic `libvirtd`, full stop. That requirement is what
+# broke in the field on a RHEL 9.8 host: libvirtd was correctly started, but
+# nothing masked the modular daemons, so RHEL 9.8's own systemd presets let
+# `virtqemud`/`virtnetworkd`/`virtstoraged` come up on their own and sit
+# alongside it (see docs/LESSONS_LEARNED_AND_FIXES.md #6). Masking them fixed
+# `systemctl status`, but then `community.libvirt.virt_pool`/`virt_net`
+# failed with "Failed to connect socket to '/var/run/libvirt/virtqemud-sock':
+# Connection refused" — the libvirt CLIENT library resolves a bare
+# `qemu:///system` URI straight to the modular socket whenever the modular
+# daemon packages are installed, regardless of systemd state, and never
+# falls back to `libvirtd-sock` on its own (see item #7).
+#
+# The fix keeps RHEL 9 monolithic as required: mask the modular daemons AND
+# stop relying on the ambiguous `qemu:///system` URI. `rhel_kvm_libvirt_uri`
+# below points every `community.libvirt.*` task straight at libvirtd's own
+# socket, so the client has nothing left to auto-resolve.
 rhel_kvm_daemon_model: monolithic
 
+# Explicit, unambiguous connection URI for all community.libvirt.* tasks.
+# Bypasses the client's default qemu:///system -> virtqemud-sock resolution.
+rhel_kvm_libvirt_uri: "qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock"
 
-# Monolithic systemd sockets to enabled and start
+# Monolithic systemd sockets to enable and start
 rhel_kvm_sockets:
   - libvirtd.socket
   - libvirtd-ro.socket
@@ -16,5 +34,30 @@ rhel_kvm_sockets:
 rhel_kvm_services:
   - libvirtd.service
 
-# Modular sockets to disable/mask (not used on RHEL 9 monolithic)
-rhel_kvm_disabled_sockets: []
+# Modular daemons must be stopped and masked on RHEL 9 so they can never win
+# the default connection or run alongside libvirtd unmanaged.
+rhel_kvm_disabled_services:
+  - virtqemud.service
+  - virtqemud.socket
+  - virtqemud-ro.socket
+  - virtqemud-admin.socket
+  - virtnetworkd.service
+  - virtnetworkd.socket
+  - virtnetworkd-ro.socket
+  - virtnetworkd-admin.socket
+  - virtstoraged.service
+  - virtstoraged.socket
+  - virtstoraged-ro.socket
+  - virtstoraged-admin.socket
+  - virtnodedevd.service
+  - virtnodedevd.socket
+  - virtnodedevd-ro.socket
+  - virtnodedevd-admin.socket
+  - virtsecretd.service
+  - virtsecretd.socket
+  - virtsecretd-ro.socket
+  - virtsecretd-admin.socket
+  - virtnwfilterd.service
+  - virtnwfilterd.socket
+  - virtnwfilterd-ro.socket
+  - virtnwfilterd-admin.socket

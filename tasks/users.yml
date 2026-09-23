@@ -19,7 +19,7 @@
     content: |
       # Managed by Ansible - rhel_kvm
       # Routes virsh commands for libvirt group members to the system hypervisor by default
-      export LIBVIRT_DEFAULT_URI="qemu:///system"
+      export LIBVIRT_DEFAULT_URI="{{ rhel_kvm_libvirt_uri }}"
     owner: root
     group: root
     mode: "0644"

@@ -7,7 +7,7 @@
     name: "{{ rhel_kvm_bridge_network_name }}"
     state: present
     xml: "{{ lookup('ansible.builtin.template', 'bridge_network.xml.j2') }}"
-    uri: "qemu:///system"
+    uri: "{{ rhel_kvm_libvirt_uri }}"
   when: rhel_kvm_manage_bridge_network | bool
 
 # Activates and sets autostart for the dedicated bridge network
@@ -16,5 +16,5 @@
     name: "{{ rhel_kvm_bridge_network_name }}"
     state: active
     autostart: "{{ rhel_kvm_bridge_autostart | default(true) }}"
-    uri: "qemu:///system"
+    uri: "{{ rhel_kvm_libvirt_uri }}"
   when: rhel_kvm_manage_bridge_network | bool

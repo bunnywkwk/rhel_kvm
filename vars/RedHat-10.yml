@@ -3,6 +3,11 @@
 
 rhel_kvm_daemon_model: modular
 
+# Bare qemu:///system already resolves to the modular sockets here (libvirtd
+# doesn't exist on RHEL 10), so no explicit socket path is needed like on
+# RHEL 9's rhel_kvm_libvirt_uri.
+rhel_kvm_libvirt_uri: "qemu:///system"
+
 # Modular driver systemd sockets to enabled and start
 rhel_kvm_sockets:
   - virtqemud.socket

@@ -18,15 +18,17 @@ Detailed architectural justifications, folder structure breakdowns, and verifica
 
 ### 1. Monolithic (RHEL 9) vs. Modular (RHEL 10) Daemon Models
 
-- **RHEL 9**: Libvirt operates as a traditional **monolithic daemon** (`libvirtd.service` / `libvirtd.socket`).
+- **RHEL 9**: Libvirt operates as a traditional **monolithic daemon** (`libvirtd.service` / `libvirtd.socket`). This is a fixed requirement, not just an OS default.
 - **RHEL 10**: Red Hat completely deprecated and removed the monolithic `libvirtd`. In its place, specialized **modular daemons** handle individual subsystems (`virtqemud` for compute, `virtnetworkd` for virtual switches, `virtstoraged` for storage pools).
 - **The 3-Step Decision Chain**: The role automatically detects `ansible_facts['distribution_major_version']`, loads the corresponding variable file (`vars/RedHat-9.yml` or `vars/RedHat-10.yml`), and applies the correct systemd socket units without complex inline conditionals.
+- **`rhel_kvm_libvirt_uri`**: On RHEL 9.8+, the libvirt client library resolves a bare `qemu:///system` straight to the modular socket (`virtqemud-sock`) whenever the modular packages are present on disk — regardless of which daemon is actually enabled. Masking the modular daemons alone is not sufficient to keep `libvirtd` reachable. Every `community.libvirt.*` task and the `LIBVIRT_DEFAULT_URI` exported for interactive `virsh` sessions use `rhel_kvm_libvirt_uri` instead of a hardcoded URI: on RHEL 9 it's the explicit `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock`, on RHEL 10 it's plain `qemu:///system`. See `docs/LESSONS_LEARNED_AND_FIXES.md` items #6/#7.
 
 ### Monolithic (RHEL 9) vs. Modular (RHEL 10) Daemon Models
 
-- **RHEL 9**: Libvirt operates as a traditional monolithic daemon (`libvirtd.service` / `libvirtd.socket`).
+- **RHEL 9**: Libvirt operates as a traditional monolithic daemon (`libvirtd.service` / `libvirtd.socket`). This is a fixed requirement, not just an OS default.
 - **RHEL 10**: Red Hat completely deprecated and removed monolithic `libvirtd`. In its place, specialized modular daemons handle individual subsystems (`virtqemud` for compute, `virtnetworkd` for virtual switches, `virtstoraged` for storage pools).
 - **Automated OS Adaptation**: The role automatically detects `ansible_facts['distribution_major_version']`, loads the corresponding variable file (`vars/RedHat-9.yml` or `vars/RedHat-10.yml`), and applies the correct systemd socket units without complex inline conditionals.
+- **`rhel_kvm_libvirt_uri`**: forces every `community.libvirt.*` task (and interactive `virsh`, via `LIBVIRT_DEFAULT_URI`) onto an explicit connection URI instead of a bare `qemu:///system` — required on RHEL 9 because the libvirt client otherwise defaults to the modular socket even when `libvirtd` is the enabled daemon. See `docs/LESSONS_LEARNED_AND_FIXES.md` items #6/#7.
 
 ### 2. CIS Benchmark Level 1 Compatibility
 
@@ -175,9 +177,17 @@ Alternatively, you can manually verify individual components:
 # 1. Verify Active Sockets / Services
 # On RHEL 9:
 systemctl is-active libvirtd.socket libvirtd.service
+# Modular daemons must be masked, not just inactive, on RHEL 9:
+systemctl is-enabled virtqemud.socket virtnetworkd.socket virtstoraged.socket   # expect "masked"
 
 # On RHEL 10:
 systemctl is-active virtqemud.socket virtnetworkd.socket virtstoraged.socket
+
+# 1b. Confirm the client actually reaches the required daemon (RHEL 9 only)
+# A bare `virsh -c qemu:///system` can silently resolve to the masked modular
+# socket and fail even though libvirtd itself is healthy — always test with
+# the explicit URI the role configures via rhel_kvm_libvirt_uri:
+virsh -c "qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock" list --all
 
 # 2. Check Storage Pools
 virsh pool-list --all
