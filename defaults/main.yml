@@ -16,7 +16,6 @@ rhel_kvm_storage_pools:
     path: /var/lib/libvirt/images
     type: dir
     autostart: true
-    state: active
 
 # Provisions a dedicated virtual switch for inter-VM and VM-to-host communication
 rhel_kvm_manage_bridge_network: true
@@ -27,5 +26,3 @@ rhel_kvm_bridge_netmask: "255.255.255.0"
 rhel_kvm_bridge_dhcp_start: "192.168.100.10"
 rhel_kvm_bridge_dhcp_end: "192.168.100.254"
 rhel_kvm_bridge_autostart: true
-
-# Deploy automated verification script to /usr/local/bin

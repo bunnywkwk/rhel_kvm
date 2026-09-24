@@ -18,7 +18,10 @@
 # stop relying on the ambiguous `qemu:///system` URI. `rhel_kvm_libvirt_uri`
 # below points every `community.libvirt.*` task straight at libvirtd's own
 # socket, so the client has nothing left to auto-resolve.
-rhel_kvm_daemon_model: monolithic
+
+# RHEL 9 validates only the classic RSA signature; no redhat-release update
+# needed (see tasks/packages.yml for the RHEL 10 post-quantum key).
+rhel_kvm_update_redhat_release: false
 
 # Explicit, unambiguous connection URI for all community.libvirt.* tasks.
 # Bypasses the client's default qemu:///system -> virtqemud-sock resolution.

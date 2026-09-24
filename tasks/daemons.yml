@@ -11,6 +11,28 @@
   loop: "{{ rhel_kvm_disabled_services | default([]) }}"
   failed_when: false
 
+# The socket must be listening before its service, never the other way round.
+# If the service is already running on its own (it can win the race at boot),
+# starting the socket is refused ("Socket service X already active, refusing")
+# and, because the socket unit has RemoveOnStop=yes, systemd then deletes the
+# socket files (/run/libvirt/libvirt-sock) while the daemon keeps running:
+# every client gets "No such file or directory". So when the primary socket is
+# not active, stop the service first; the tasks below start sockets, then the
+# service. See docs/LESSONS_LEARNED_AND_FIXES.md item #8.
+- name: Check whether the primary libvirt socket is active
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ rhel_kvm_sockets | first }}"]
+  register: rhel_kvm_primary_socket
+  changed_when: false
+  failed_when: false
+
+- name: Stop libvirt services that are running without their socket
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+  loop: "{{ rhel_kvm_services }}"
+  when: rhel_kvm_primary_socket.stdout != 'active'
+
 # Enables systemd socket activation (libvirtd.socket on RHEL 9 or all 6 driver sockets on RHEL 10)
 - name: Enable and start libvirt systemd sockets
   ansible.builtin.systemd_service:

@@ -7,8 +7,7 @@ galaxy_info:
   company: "Aeron - Trainee at AIRNAV"
   license: MIT
   role_name: rhel_kvm
-  namespace: ansible-lockdown
-  min_ansible_version: "2.16.1"
+  min_ansible_version: "2.15"
   platforms:
     - name: EL
       versions:

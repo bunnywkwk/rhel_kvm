@@ -22,7 +22,7 @@ Provision a bare RHEL 9 or RHEL 10 server into a production-grade KVM Hypervisor
 ### Step 2: Tasks Implementation (Completed)
 - [x] **`tasks/main.yml`**: Master orchestrator calling sub-tasks in logical sequence.
 - [x] **`tasks/preflight.yml`**: CPU hardware virtualization check (`vmx`/`svm`) and kernel modules (`kvm`, `vhost_net`, `tun`).
-- [x] **`tasks/packages.yml`**: DNF installation of `qemu-kvm`, `libvirt`, `virt-install`, `libguestfs-tools`.
+- [x] **`tasks/packages.yml`**: On RHEL 10, update `redhat-release` (`rhel_kvm_update_redhat_release`), then DNF installation of `qemu-kvm`, `libvirt`, `virt-install`, `python3-libvirt`.
 - [x] **`tasks/sysctl.yml`**: Kernel IP forwarding configuration (`/etc/sysctl.d/99-kvm.conf`).
 - [x] **`tasks/daemons.yml`**: Enabling/starting the appropriate sockets and services per OS major version.
 - [x] **`tasks/storage.yml`**: Directory creation, SELinux labeling (`virt_image_t`), and storage pool provisioning.
@@ -32,7 +32,7 @@ Provision a bare RHEL 9 or RHEL 10 server into a production-grade KVM Hypervisor
 ---
 
 ### Step 3: Handlers, Templates & Tests (Completed)
-- [x] **`handlers/main.yml`**: Service reload, systemd reload, and sysctl refresh handlers.
+- [x] **`handlers/main.yml`**: `Reload sysctl` handler, notified when `/etc/sysctl.d/99-kvm.conf` changes.
 - [x] **`templates/storage_pool.xml.j2`**: Idempotent libvirt storage pool XML template.
 - [x] **`tests/inventory` & `tests/test.yml`**: Test inventory and test playbook targeting test VM.
 

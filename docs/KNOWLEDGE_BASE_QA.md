@@ -87,7 +87,27 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
    - _On RHEL 9_: Disables and masks the modular daemons (`virtqemud`, `virtnetworkd`, `virtstoraged`, `virtnodedevd`, `virtsecretd`, `virtnwfilterd` — services and sockets), which RHEL 9.8's own systemd presets would otherwise bring up on their own.
    - _On RHEL 10_: It actively disables and masks legacy `libvirtd` units so they can never interfere.
 
-2. **Starting the appropriate Sockets**:
+2. **Making sure the socket, not the service, comes first**:
+
+   ```yaml
+   - name: Check whether the primary libvirt socket is active
+     ansible.builtin.command:
+       argv: [systemctl, is-active, "{{ rhel_kvm_sockets | first }}"]
+     register: rhel_kvm_primary_socket
+     changed_when: false
+     failed_when: false
+
+   - name: Stop libvirt services that are running without their socket
+     ansible.builtin.systemd_service:
+       name: "{{ item }}"
+       state: stopped
+     loop: "{{ rhel_kvm_services }}"
+     when: rhel_kvm_primary_socket.stdout != 'active'
+   ```
+
+   - If the service is already running without its socket (seen on RHEL 9 after a reboot), starting the socket is refused and `RemoveOnStop=yes` makes systemd delete `/run/libvirt/libvirt-sock`. Stopping the service first lets the socket bind cleanly. When the socket is already active this is skipped. See lessons item #8.
+
+3. **Starting the appropriate Sockets**:
 
    ```yaml
    - name: Enable and start libvirt systemd sockets
@@ -101,9 +121,9 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
    - _On RHEL 9_: Starts `libvirtd.socket` units.
    - _On RHEL 10_: Starts all modular sockets (`virtqemud.socket`, `virtnetworkd.socket`, `virtstoraged.socket`, etc.).
 
-3. **Starting Monolithic Service (RHEL 9 only)**:
+4. **Starting the services**:
    ```yaml
-   - name: Enable and start libvirt systemd services (Monolithic)
+   - name: Enable and start libvirt systemd services
      ansible.builtin.systemd_service:
        name: "{{ item }}"
        enabled: true
@@ -113,9 +133,9 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
    ```
 
    - _On RHEL 9_: `rhel_kvm_services` has `[libvirtd.service]` → starts the monolithic service.
-   - _On RHEL 10_: `rhel_kvm_services` is `[]` (empty) → Ansible automatically skips this task cleanly.
+   - _On RHEL 10_: `rhel_kvm_services` has `virtqemud`, `virtnetworkd` and `virtstoraged` → started so pool/network/VM autostart works on boot.
 
-4. **Forcing an unambiguous connection (RHEL 9's real fix)**: Masking the modular daemons alone isn't enough — the libvirt client library still resolves `qemu:///system` to the modular socket path by default whenever the modular packages exist on disk. Every `community.libvirt.virt_pool`/`virt_net` task in `tasks/storage.yml` and `tasks/networks.yml` uses `uri: "{{ rhel_kvm_libvirt_uri }}"` instead of a hardcoded `qemu:///system`, and `tasks/users.yml` exports the same value as `LIBVIRT_DEFAULT_URI` for interactive `virsh` sessions. On RHEL 9 that variable is the explicit socket path `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock`; on RHEL 10 it's just `qemu:///system` since libvirtd doesn't exist there to be ambiguous with.
+5. **Forcing an unambiguous connection (RHEL 9's real fix)**: Masking the modular daemons alone isn't enough — the libvirt client library still resolves `qemu:///system` to the modular socket path by default whenever the modular packages exist on disk. Every `community.libvirt.virt_pool`/`virt_net` task in `tasks/storage.yml` and `tasks/networks.yml` uses `uri: "{{ rhel_kvm_libvirt_uri }}"` instead of a hardcoded `qemu:///system`, and `tasks/users.yml` exports the same value as `LIBVIRT_DEFAULT_URI` for interactive `virsh` sessions. On RHEL 9 that variable is the explicit socket path `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock`; on RHEL 10 it's just `qemu:///system` since libvirtd doesn't exist there to be ambiguous with.
 
 ---
 
@@ -200,7 +220,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 - **A**:
   - **Filesystem Directory**: **YES**. The RPM package `libvirt-daemon` creates `/var/lib/libvirt/images` on disk.
   - **Libvirt Logical Storage Pool**: **NO**. On a fresh minimal RHEL 9 or RHEL 10 CLI install, `virsh pool-list --all` returns an **empty table**. Libvirt does not register the directory as a storage pool until someone defines it (`virsh pool-define-as` or `community.libvirt.virt_pool`) and starts it.
-  - **Why our role manages it**: If our automation did not activate it, CLI tools like `virt-install` and acceptance scripts would fail with `error: Storage pool not found`. Our role uses `community.libvirt.virt_pool` with `state: active` and `autostart: true` to guarantee the hypervisor is 100% operational immediately.
+  - **Why our role manages it**: If our automation did not activate it, CLI tools like `virt-install` would fail with `error: Storage pool not found`. Our role uses `community.libvirt.virt_pool` with `state: active` and `autostart: true` to guarantee the hypervisor is 100% operational immediately.
 
 ---
 

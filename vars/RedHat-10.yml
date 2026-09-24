@@ -1,7 +1,10 @@
 ---
 # RHEL 10 - Modular Libvirt Daemon model
 
-rhel_kvm_daemon_model: modular
+# RHEL 10 packages are also signed with a post-quantum key that an older 10.1
+# image doesn't have: redhat-release is updated before packages are installed
+# (see tasks/packages.yml).
+rhel_kvm_update_redhat_release: true
 
 # Bare qemu:///system already resolves to the modular sockets here (libvirtd
 # doesn't exist on RHEL 10), so no explicit socket path is needed like on

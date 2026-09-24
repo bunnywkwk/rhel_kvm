@@ -1,61 +1,41 @@
-# Ansible Role: `rhel_kvm`
-
 # Ansible Role: rhel_kvm
 
 An enterprise-grade Ansible role to transform a bare **RHEL 9** or **RHEL 10** server into a production-ready **KVM Hypervisor Host**.
-An enterprise-grade Ansible role to transform a bare RHEL 9 or RHEL 10 server into a production-ready KVM Hypervisor Host.
 
-This role dynamically adapts to the underlying operating system version, managing **Monolithic Libvirt on RHEL 9** and **Modular Libvirt Daemons on RHEL 10**, with automated storage pool provisioning, virtual networking, SELinux enforcement, and CIS Benchmark Level 1 compatibility.
-This role dynamically adapts to the underlying operating system version, managing Monolithic Libvirt on RHEL 9 and Modular Libvirt Daemons on RHEL 10, with automated storage pool provisioning, virtual networking, SELinux enforcement, and CIS Benchmark Level 1 compatibility.
+The role adapts to the underlying operating system version, managing **monolithic `libvirtd` on RHEL 9** and **modular libvirt daemons on RHEL 10**, with automated storage pool provisioning, virtual networking, SELinux enforcement, and CIS Benchmark Level 1 compatibility.
 
-Detailed architectural justifications, folder structure breakdowns, and verification procedures are documented in [docs/ARCHITECTURE_AND_JUSTIFICATIONS.md](docs/ARCHITECTURE_AND_JUSTIFICATIONS.md).
-
----
-
-## Architectural Overview & Technical Justifications
-
-## 1. Architectural Overview and Technical Justifications
-
-### 1. Monolithic (RHEL 9) vs. Modular (RHEL 10) Daemon Models
-
-- **RHEL 9**: Libvirt operates as a traditional **monolithic daemon** (`libvirtd.service` / `libvirtd.socket`). This is a fixed requirement, not just an OS default.
-- **RHEL 10**: Red Hat completely deprecated and removed the monolithic `libvirtd`. In its place, specialized **modular daemons** handle individual subsystems (`virtqemud` for compute, `virtnetworkd` for virtual switches, `virtstoraged` for storage pools).
-- **The 3-Step Decision Chain**: The role automatically detects `ansible_facts['distribution_major_version']`, loads the corresponding variable file (`vars/RedHat-9.yml` or `vars/RedHat-10.yml`), and applies the correct systemd socket units without complex inline conditionals.
-- **`rhel_kvm_libvirt_uri`**: On RHEL 9.8+, the libvirt client library resolves a bare `qemu:///system` straight to the modular socket (`virtqemud-sock`) whenever the modular packages are present on disk — regardless of which daemon is actually enabled. Masking the modular daemons alone is not sufficient to keep `libvirtd` reachable. Every `community.libvirt.*` task and the `LIBVIRT_DEFAULT_URI` exported for interactive `virsh` sessions use `rhel_kvm_libvirt_uri` instead of a hardcoded URI: on RHEL 9 it's the explicit `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock`, on RHEL 10 it's plain `qemu:///system`. See `docs/LESSONS_LEARNED_AND_FIXES.md` items #6/#7.
-
-### Monolithic (RHEL 9) vs. Modular (RHEL 10) Daemon Models
-
-- **RHEL 9**: Libvirt operates as a traditional monolithic daemon (`libvirtd.service` / `libvirtd.socket`). This is a fixed requirement, not just an OS default.
-- **RHEL 10**: Red Hat completely deprecated and removed monolithic `libvirtd`. In its place, specialized modular daemons handle individual subsystems (`virtqemud` for compute, `virtnetworkd` for virtual switches, `virtstoraged` for storage pools).
-- **Automated OS Adaptation**: The role automatically detects `ansible_facts['distribution_major_version']`, loads the corresponding variable file (`vars/RedHat-9.yml` or `vars/RedHat-10.yml`), and applies the correct systemd socket units without complex inline conditionals.
-- **`rhel_kvm_libvirt_uri`**: forces every `community.libvirt.*` task (and interactive `virsh`, via `LIBVIRT_DEFAULT_URI`) onto an explicit connection URI instead of a bare `qemu:///system` — required on RHEL 9 because the libvirt client otherwise defaults to the modular socket even when `libvirtd` is the enabled daemon. See `docs/LESSONS_LEARNED_AND_FIXES.md` items #6/#7.
-
-### 2. CIS Benchmark Level 1 Compatibility
-
-Default CIS hardening profiles often break virtualization hypervisors. This role addresses these conflicts:
-
-### CIS Benchmark Level 1 Compatibility
-
-Default CIS hardening profiles often conflict with virtualization hypervisors. This role addresses these conflicts proactively:
-
-- **Kernel IP Forwarding**: Ensures `net.ipv4.ip_forward = 1` persists in `/etc/sysctl.d/99-kvm.conf` so virtual machines on NAT bridges (`virbr0`) can route external traffic.
-- **SELinux Enforcement**: Automatically applies `virt_image_t` contexts to all storage pool directories so SELinux in **Enforcing** mode allows VM disk image I/O.
-- **Kernel Modules**: Loads and persists `kvm`, `vhost_net` (packet acceleration), and `tun` (virtual network driver).
-- **SELinux Enforcement**: Automatically applies `virt_image_t` contexts to all storage pool directories so SELinux in `Enforcing` mode allows VM disk image I/O.
-- **Kernel Modules**: Loads and persists `kvm`, `vhost_net` (in-kernel packet acceleration), and `tun` (virtual network driver).
+Task-by-task explanation (what each task does and why it exists): [docs/TASK_WALKTHROUGH.md](docs/TASK_WALKTHROUGH.md).
+Architectural justifications and folder structure: [docs/ARCHITECTURE_AND_JUSTIFICATIONS.md](docs/ARCHITECTURE_AND_JUSTIFICATIONS.md).
 
 ---
 
-## Requirements & Collections
+## 1. Architectural Overview
 
-## 2. Requirements and Collections
+### Monolithic (RHEL 9) vs. Modular (RHEL 10) daemon models
 
-### Supported Platforms
+- **RHEL 9**: libvirt runs as the traditional **monolithic daemon** (`libvirtd.service` / `libvirtd.socket`). This is a fixed requirement, not just an OS default. The modular daemons (`virtqemud`, `virtnetworkd`, ...) are stopped and masked so they can never run alongside it.
+- **RHEL 10**: Red Hat removed the monolithic `libvirtd`. Specialised **modular daemons** handle individual subsystems (`virtqemud` for compute, `virtnetworkd` for virtual switches, `virtstoraged` for storage pools).
+- **OS adaptation**: the role reads `ansible_facts['distribution_major_version']`, loads `vars/RedHat-9.yml` or `vars/RedHat-10.yml`, and applies the matching sockets/services without inline conditionals.
+- **`rhel_kvm_libvirt_uri`**: on RHEL 9.8+ the libvirt client library resolves a bare `qemu:///system` to the modular socket (`virtqemud-sock`) whenever the modular packages are on disk, regardless of which daemon is enabled. Masking the modular daemons alone therefore does not keep `libvirtd` reachable. Every `community.libvirt.*` task, and the `LIBVIRT_DEFAULT_URI` exported for interactive `virsh`, uses this variable: on RHEL 9 it is the explicit `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock`, on RHEL 10 plain `qemu:///system`.
+
+### CIS Benchmark Level 1 compatibility
+
+Default CIS hardening profiles often conflict with virtualization hypervisors. This role addresses that proactively:
+
+- **Kernel IP forwarding**: `net.ipv4.ip_forward = 1` persists in `/etc/sysctl.d/99-kvm.conf`, so VMs on NAT bridges can route external traffic. The `99-` prefix sorts after CIS's `60-*.conf`, so it wins when `sysctl --system` runs.
+- **SELinux enforcement**: `virt_image_t` is applied to every storage pool directory so SELinux in `Enforcing` mode allows VM disk I/O.
+- **Kernel modules**: `kvm`, `vhost_net` (in-kernel packet acceleration) and `tun` (virtual network driver) are loaded and persisted.
+
+---
+
+## 2. Requirements
+
+### Supported platforms
 
 - Red Hat Enterprise Linux 9 / AlmaLinux 9 / Rocky Linux 9
 - Red Hat Enterprise Linux 10 / AlmaLinux 10 / CentOS Stream 10
 
-### Required Collections
+### Required collections
 
 - `ansible.posix` (>= 1.5.0)
 - `community.general` (>= 7.0.0)
@@ -65,32 +45,29 @@ Default CIS hardening profiles often conflict with virtualization hypervisors. T
 
 ## 3. Role Variables
 
-Available default variables are defined in [defaults/main.yml](defaults/main.yml):
+Overridable defaults are in [defaults/main.yml](defaults/main.yml):
 
-| Variable                        | Default         | Description                                                                    |
-| :------------------------------ | :-------------- | :----------------------------------------------------------------------------- |
-| `rhel_kvm_manage_sysctl`             | `true`          | Configures `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/99-kvm.conf`.           |
-| `rhel_kvm_admin_users`               | `[]`            | List of user accounts to add to the `libvirt` group for non-root management.   |
-| `rhel_kvm_extra_packages`            | `[]`            | Optional extra user packages to install alongside core hypervisor packages.    |
-| `rhel_kvm_storage_pools`             | _(List)_        | List of storage pools to provision (defaults to `/var/lib/libvirt/images`).    |
-| `rhel_kvm_manage_bridge_network`     | `true`          | Whether to provision the dedicated hypervisor bridge network.                  |
-| `rhel_kvm_bridge_network_name`       | `kvm_br0`       | Name of the dedicated virtual bridge network in libvirt.                       |
-| `rhel_kvm_bridge_device`             | `virbr1`        | Linux bridge interface name for the dedicated virtual switch.                  |
-| `rhel_kvm_bridge_ip`                 | `192.168.100.1` | Gateway IP address assigned to the hypervisor on the bridge.                   |
-| `rhel_kvm_bridge_autostart`          | `true`          | Whether the dedicated bridge starts automatically on boot.                     |
-| `kvm_deploy_verification_tools` | `true`          | Deploys `/usr/local/bin/verify_hypervisor.py` for automated compliance checks. |
+| Variable                         | Default         | Description                                                                  |
+| :------------------------------- | :-------------- | :--------------------------------------------------------------------------- |
+| `rhel_kvm_manage_sysctl`         | `true`          | Configures `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/99-kvm.conf`.         |
+| `rhel_kvm_admin_users`           | `[]`            | Accounts added to the `libvirt` group for non-root management.               |
+| `rhel_kvm_extra_packages`        | `[]`            | Optional extra packages installed alongside the core hypervisor packages.    |
+| `rhel_kvm_storage_pools`         | _(list)_        | Storage pools to provision (default: `/var/lib/libvirt/images`).             |
+| `rhel_kvm_manage_bridge_network` | `true`          | Whether to provision the dedicated hypervisor bridge network.                |
+| `rhel_kvm_bridge_network_name`   | `kvm_br0`       | Name of the dedicated virtual network in libvirt.                            |
+| `rhel_kvm_bridge_device`         | `virbr1`        | Linux bridge interface name for that network.                                |
+| `rhel_kvm_bridge_ip`             | `192.168.100.1` | Gateway IP assigned to the hypervisor on the bridge.                         |
+| `rhel_kvm_bridge_netmask`        | `255.255.255.0` | Netmask of the bridge network.                                               |
+| `rhel_kvm_bridge_dhcp_start/end` | `.10` / `.254`  | DHCP range handed to guests.                                                 |
+| `rhel_kvm_bridge_autostart`      | `true`          | Whether the bridge network starts automatically on boot.                     |
 
-_Note: Mandatory core packages (`qemu-kvm`, `libvirt`, `virt-install`, etc.) are defined in `vars/main.yml` as protected role constants to prevent accidental omission._
+Protected constants live in `vars/` (higher precedence, so `group_vars` cannot accidentally replace them): the core package list (`vars/main.yml`) and the per-OS daemon, socket, URI and `redhat-release` settings (`vars/RedHat-9.yml`, `vars/RedHat-10.yml`).
 
 ---
 
-## Example Usage
-
 ## 4. Example Usage
 
-### 1. Minimal Playbook (Default Configuration)
-
-### 1. Standard Playbook Execution
+### Minimal playbook
 
 ```yaml
 ---
@@ -101,7 +78,7 @@ _Note: Mandatory core packages (`qemu-kvm`, `libvirt`, `virt-install`, etc.) are
     - role: rhel_kvm
 ```
 
-### 2. Custom Storage Pools and Admin Users
+### Custom storage pools and admin users
 
 ```yaml
 ---
@@ -119,90 +96,42 @@ _Note: Mandatory core packages (`qemu-kvm`, `libvirt`, `virt-install`, etc.) are
         path: /var/lib/libvirt/images
         type: dir
         autostart: true
-        state: active
       - name: iso_pool
         path: /var/lib/libvirt/iso
         type: dir
         autostart: true
-        state: active
   roles:
     - role: rhel_kvm
 ```
 
 ---
 
-## Verification & Health Checks
+## 5. Verification
 
-## 5. Verification and Health Checks
-
-### 1. Automated 1-Click Verification Tool (Recommended)
-
-This role automatically deploys a standalone Python diagnostic verification script to `/usr/local/bin/verify_hypervisor.py`.
-
-### Automated 1-Click Verification Tool
-
-This role deploys a standalone Python diagnostic verification script to `/usr/local/bin/verify_hypervisor.py`.
-
-SSH into the hypervisor host and run:
-Execute the tool directly on the hypervisor host:
+Run these on the hypervisor:
 
 ```bash
-/usr/local/bin/verify_hypervisor.py
-```
-
-This tool automatically validates:
-
-- **OS Architecture**: Detects RHEL 9 vs RHEL 10.
-- **Daemon Model**: Verifies active `libvirtd` on RHEL 9 or active modular sockets (`virtqemud`, `virtnetworkd`, `virtstoraged`) and masked legacy daemons on RHEL 10.
-- **Storage Pools**: Confirms active storage pools, autostart status, and `virt_image_t` SELinux context.
-- **Virtual Networking**: Checks `virbr0` bridge status and autostart.
-- **Kernel & Routing**: Verifies `net.ipv4.ip_forward = 1` and loaded kernel modules (`kvm`, `vhost_net`, `tun`).
-  This tool validates:
-
-1. **OS Architecture**: Detects RHEL 9 vs RHEL 10.
-2. **Daemon Model**: Verifies active `libvirtd` on RHEL 9 or active modular sockets (`virtqemud`, `virtnetworkd`, `virtstoraged`) and masked legacy daemons on RHEL 10.
-3. **Storage Pools**: Confirms active storage pools, autostart status, and `virt_image_t` SELinux context.
-4. **Virtual Networking**: Checks `virbr0` bridge status and autostart.
-5. **Kernel and Routing**: Verifies `net.ipv4.ip_forward = 1` and loaded kernel modules (`kvm`, `vhost_net`, `tun`).
-
----
-
-### 2. Manual CLI Commands
-
-Alternatively, you can manually verify individual components:
-
-### Manual Verification Commands
-
-```bash
-# 1. Verify Active Sockets / Services
-# On RHEL 9:
+# 1. Sockets / services
+# RHEL 9:
 systemctl is-active libvirtd.socket libvirtd.service
-# Modular daemons must be masked, not just inactive, on RHEL 9:
 systemctl is-enabled virtqemud.socket virtnetworkd.socket virtstoraged.socket   # expect "masked"
-
-# On RHEL 10:
+# RHEL 10:
 systemctl is-active virtqemud.socket virtnetworkd.socket virtstoraged.socket
 
-# 1b. Confirm the client actually reaches the required daemon (RHEL 9 only)
-# A bare `virsh -c qemu:///system` can silently resolve to the masked modular
-# socket and fail even though libvirtd itself is healthy — always test with
-# the explicit URI the role configures via rhel_kvm_libvirt_uri:
+# 1b. RHEL 9 only: test with the explicit URI the role uses. A bare
+# `virsh -c qemu:///system` can resolve to the masked modular socket and fail
+# even though libvirtd is healthy.
 virsh -c "qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock" list --all
 
-# 2. Check Storage Pools
+# 2. Storage pools and networks
 virsh pool-list --all
-
-# 3. Check Virtual Networks
 virsh net-list --all
 
-# 4. Verify Kernel IP Forwarding
-sysctl net.ipv4.ip_forward
-# Expected output: net.ipv4.ip_forward = 1
+# 3. Kernel IP forwarding
+sysctl net.ipv4.ip_forward     # expect net.ipv4.ip_forward = 1
 ```
 
 ---
-
-## License & Author
 
 ## 6. License and Author
 

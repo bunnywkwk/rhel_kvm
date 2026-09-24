@@ -1,6 +1,18 @@
 ---
 # Package Installation
 
+# RHEL 10 packages carry a second, post-quantum signature (ML-DSA-87+Ed448,
+# Red Hat "release key 4", key ID 05707a62). On an older RHEL 10.1 image, whose
+# redhat-release predates it, ansible.builtin.dnf fails with "Public key for
+# <pkg>.rpm is not installed". Updating redhat-release is the documented
+# workaround (docs/LESSONS_LEARNED_AND_FIXES.md item #5).
+# Gated per OS via vars/ (RHEL 9 validates the classic RSA signature only).
+- name: Update redhat-release so the current Red Hat signing keys are on disk
+  ansible.builtin.dnf:
+    name: redhat-release
+    state: latest
+  when: rhel_kvm_update_redhat_release | bool
+
 # Installs non-negotiable core KVM hypervisor binaries and libraries from vars/main.yml
 - name: Install core KVM hypervisor packages
   ansible.builtin.dnf:
