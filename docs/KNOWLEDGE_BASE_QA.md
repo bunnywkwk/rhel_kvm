@@ -18,7 +18,7 @@ This document contains the core technical questions, architecture decisions, net
 ### Q2: Why does RHEL 9 use Monolithic Libvirt while RHEL 10 uses Modular Libvirt?
 
 - **A**:
-  - **RHEL 9 (Monolithic — REQUIRED)**: A single service `libvirtd` handles everything (QEMU management, storage pools, network interfaces, secret management). This is a hard project requirement, not just an OS default — see the URI note below for why that requirement needed extra work to hold up.
+  - **RHEL 9 (Monolithic — REQUIRED)**: A single service `libvirtd` handles everything (QEMU management, storage pools, network interfaces, secret management). This is a hard project requirement, not just an OS default.
   - **RHEL 10 (Modular)**: Red Hat removed the monolithic `libvirtd` daemon. Instead, specialized daemons manage individual subsystems:
     - `virtqemud`: Handles QEMU/KVM virtual machine instances.
     - `virtnetworkd`: Handles virtual bridges, NAT, and network routing.
@@ -27,7 +27,6 @@ This document contains the core technical questions, architecture decisions, net
     - `virtsecretd`: Handles encryption keys and passwords.
     - `virtnwfilterd`: Handles network firewall filters.
   - **Why RHEL 10 changed**: **Security & Isolation (Least Privilege)**. If one driver (e.g. storage) fails or encounters an exploit, it cannot compromise the hypervisor kernel or other drivers.
-  - **Field gotcha on RHEL 9.8**: masking the modular daemons is necessary but not sufficient. The libvirt **client** library (used by `virsh` and `community.libvirt.virt_pool`/`virt_net`) resolves a bare `qemu:///system` URI straight to the modular socket (`virtqemud-sock`) whenever the modular packages are installed — it does not know or care that the daemon behind it is masked, and it never falls back to `libvirtd-sock` on its own. Masking `virtqemud` without also fixing the URI just turns "silently wrong daemon" into "connection refused." The actual fix is `rhel_kvm_libvirt_uri`, defined per-OS in `vars/RedHat-9.yml` as `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock` (bypasses the ambiguous resolution entirely) and used by every `community.libvirt.*` task and the `LIBVIRT_DEFAULT_URI` exported for interactive `virsh` sessions in `tasks/users.yml`. See `docs/LESSONS_LEARNED_AND_FIXES.md` items #6/#7.
 
 ---
 
@@ -57,15 +56,13 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 ```
 
 - **If RHEL 9**: It reads `vars/RedHat-9.yml` and loads:
-  - `rhel_kvm_sockets`: `[libvirtd.socket, libvirtd-ro.socket, libvirtd-admin.socket]`
+  - `rhel_kvm_sockets`: `[]` (no sockets are managed)
   - `rhel_kvm_services`: `[libvirtd.service]`
-  - `rhel_kvm_disabled_services`: `[virtqemud.*, virtnetworkd.*, virtstoraged.*, virtnodedevd.*, virtsecretd.*, virtnwfilterd.* — services and sockets]`
-  - `rhel_kvm_libvirt_uri`: `"qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock"`
+  - `rhel_kvm_disabled_services`: `[]` (nothing is masked)
 - **If RHEL 10**: It reads `vars/RedHat-10.yml` and loads:
-  - `rhel_kvm_sockets`: `[virtqemud.socket, virtnetworkd.socket, virtstoraged.socket, ...]`
-  - `rhel_kvm_services`: `[virtqemud.service, virtnetworkd.service, virtstoraged.service]`
+  - `rhel_kvm_sockets`: `[virtqemud.socket, virtnetworkd.socket, virtstoraged.socket, ...]` (all drivers)
+  - `rhel_kvm_services`: `[virtqemud.service]`
   - `rhel_kvm_disabled_services`: `[libvirtd.service, libvirtd.socket, ...]`
-  - `rhel_kvm_libvirt_uri`: `"qemu:///system"` (already unambiguous — libvirtd doesn't exist here)
 
 #### Step 3: Clean Execution in `tasks/daemons.yml`
 
@@ -84,30 +81,10 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
      failed_when: false
    ```
 
-   - _On RHEL 9_: Disables and masks the modular daemons (`virtqemud`, `virtnetworkd`, `virtstoraged`, `virtnodedevd`, `virtsecretd`, `virtnwfilterd` — services and sockets), which RHEL 9.8's own systemd presets would otherwise bring up on their own.
+   - _On RHEL 9_: the list is empty, so nothing is disabled or masked.
    - _On RHEL 10_: It actively disables and masks legacy `libvirtd` units so they can never interfere.
 
-2. **Making sure the socket, not the service, comes first**:
-
-   ```yaml
-   - name: Check whether the primary libvirt socket is active
-     ansible.builtin.command:
-       argv: [systemctl, is-active, "{{ rhel_kvm_sockets | first }}"]
-     register: rhel_kvm_primary_socket
-     changed_when: false
-     failed_when: false
-
-   - name: Stop libvirt services that are running without their socket
-     ansible.builtin.systemd_service:
-       name: "{{ item }}"
-       state: stopped
-     loop: "{{ rhel_kvm_services }}"
-     when: rhel_kvm_primary_socket.stdout != 'active'
-   ```
-
-   - If the service is already running without its socket (seen on RHEL 9 after a reboot), starting the socket is refused and `RemoveOnStop=yes` makes systemd delete `/run/libvirt/libvirt-sock`. Stopping the service first lets the socket bind cleanly. When the socket is already active this is skipped. See lessons item #8.
-
-3. **Starting the appropriate Sockets**:
+2. **Starting the appropriate Sockets**:
 
    ```yaml
    - name: Enable and start libvirt systemd sockets
@@ -118,10 +95,10 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
      loop: "{{ rhel_kvm_sockets }}"
    ```
 
-   - _On RHEL 9_: Starts `libvirtd.socket` units.
-   - _On RHEL 10_: Starts all modular sockets (`virtqemud.socket`, `virtnetworkd.socket`, `virtstoraged.socket`, etc.).
+   - _On RHEL 9_: the list is empty, so this task does nothing.
+   - _On RHEL 10_: Starts the sockets of all drivers (`virtqemud.socket`, `virtnetworkd.socket`, `virtstoraged.socket`, etc.); each daemon starts on demand.
 
-4. **Starting the services**:
+3. **Starting the services**:
    ```yaml
    - name: Enable and start libvirt systemd services
      ansible.builtin.systemd_service:
@@ -133,9 +110,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
    ```
 
    - _On RHEL 9_: `rhel_kvm_services` has `[libvirtd.service]` → starts the monolithic service.
-   - _On RHEL 10_: `rhel_kvm_services` has `virtqemud`, `virtnetworkd` and `virtstoraged` → started so pool/network/VM autostart works on boot.
-
-5. **Forcing an unambiguous connection (RHEL 9's real fix)**: Masking the modular daemons alone isn't enough — the libvirt client library still resolves `qemu:///system` to the modular socket path by default whenever the modular packages exist on disk. Every `community.libvirt.virt_pool`/`virt_net` task in `tasks/storage.yml` and `tasks/networks.yml` uses `uri: "{{ rhel_kvm_libvirt_uri }}"` instead of a hardcoded `qemu:///system`, and `tasks/users.yml` exports the same value as `LIBVIRT_DEFAULT_URI` for interactive `virsh` sessions. On RHEL 9 that variable is the explicit socket path `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock`; on RHEL 10 it's just `qemu:///system` since libvirtd doesn't exist there to be ambiguous with.
+   - _On RHEL 10_: `rhel_kvm_services` has `virtqemud` → it runs the VMs.
 
 ---
 
@@ -202,7 +177,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
     - **Require `import_tasks`** so that `--tags rule_1.1.1` and `--skip-tags` work from the CLI, `--list-tasks` outputs the complete auditor rule inventory, and `--start-at-task` can resume failed runs.
   - **`rhel_kvm` Provisioning Role**:
     - Has an 8-step sequential infrastructure pipeline.
-    - **Uses `include_tasks`** because features like `sysctl.yml` and `users.yml` are conditionally toggled (`when: rhel_kvm_manage_sysctl | bool`). `include_tasks` allows skipping entire disabled feature files in 1 quick step at runtime instead of outputting 10 noisy skipped task lines.
+    - **Uses `include_tasks`** because features like `sysctl.yml` are conditionally toggled (`when: rhel_kvm_manage_sysctl | bool`). `include_tasks` allows skipping entire disabled feature files in 1 quick step at runtime instead of outputting 10 noisy skipped task lines.
 
 ---
 
@@ -229,11 +204,9 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 - **A**:
   - **It MUST be exposed in `defaults/main.yml`**: `/var/lib/libvirt/images` resides on the root filesystem (`/`), which is typically a small OS boot drive (50GB–100GB). In enterprise datacenters, virtual machine disks (100GB–1TB each) are stored on dedicated secondary RAID or NVMe mounts (e.g. `/data/vms`). Locking this path in `vars/` would prevent administrators from redirecting storage to dedicated disks.
   - **Yes, it works 100% dynamically**: When an administrator sets `path: /data/vms` in `defaults/main.yml` or `group_vars`:
-    1. `tasks/storage.yml` creates the directory `/data/vms` with mode `0711`.
-    2. `community.general.sefcontext` registers `/data/vms` in SELinux policy as `virt_image_t`.
-    3. `tasks/storage.yml` applies `virt_image_t` so SELinux in `Enforcing` mode does not block VM writes.
-    4. `templates/storage_pool.xml.j2` renders `<path>/data/vms</path>`.
-    5. `community.libvirt.virt_pool` defines and activates the pool in Libvirt.
+    1. `tasks/storage.yml` creates the directory `/data/vms` with mode `0711` and the label `virt_image_t`, so SELinux in `Enforcing` mode does not block VM writes.
+    2. `community.general.sefcontext` registers `/data/vms` in the SELinux policy as `virt_image_t`.
+    3. `community.libvirt.virt_pool` defines the pool with path `/data/vms`, then activates it and sets autostart.
 
 ---
 

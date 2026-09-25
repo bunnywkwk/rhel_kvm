@@ -26,5 +26,4 @@
     name: "{{ rhel_kvm_extra_packages }}"
     state: present
   when:
-    - rhel_kvm_extra_packages is defined
     - rhel_kvm_extra_packages | length > 0

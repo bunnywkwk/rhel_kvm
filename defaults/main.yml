@@ -4,18 +4,15 @@
 # Manage kernel sysctl parameters (net.ipv4.ip_forward)
 rhel_kvm_manage_sysctl: true
 
-# users to add to the libvirt group for non-root management
-rhel_kvm_admin_users: []
-
 # Users can add custom tools here (e.g. guestfs-tools) without replacing core binaries
 rhel_kvm_extra_packages: []
 
-# storage pools to provision
+# Storage pools to create. Each pool is a directory: give it a name and a path.
+# Setting this list replaces it, so include "default" again if you still want it.
+# Pools that are not listed here are left as they are.
 rhel_kvm_storage_pools:
   - name: default
     path: /var/lib/libvirt/images
-    type: dir
-    autostart: true
 
 # Provisions a dedicated virtual switch for inter-VM and VM-to-host communication
 rhel_kvm_manage_bridge_network: true

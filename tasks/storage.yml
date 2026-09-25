@@ -1,18 +1,20 @@
 ---
-# Storage Pool Provisioning & SELinux Configuration
+# Storage pools: each pool is a directory where libvirt stores VM disks.
+# Every task loops over rhel_kvm_storage_pools.
 
-# Creates directory paths (like /var/lib/libvirt/images) with restrictive 0711 permissions
-- name: Ensure storage pool directories exist with correct permissions
+# Creates the directory (root only, mode 0711) with the label QEMU needs to write VM disks.
+# The label is ignored when SELinux is disabled.
+- name: Ensure storage pool directories exist with the VM image label
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
     owner: root
     group: root
     mode: "0711"
+    setype: virt_image_t
   loop: "{{ rhel_kvm_storage_pools }}"
-  when: item.type == 'dir'
 
-# Registers virt_image_t SELinux label in the system database for persistence across filesystem relabels
+# Records the label in the SELinux policy so it survives a filesystem relabel
 - name: Set persistent SELinux context on storage directories
   community.general.sefcontext:
     target: "{{ item.path }}(/.*)?"
@@ -22,46 +24,27 @@
   when:
     - ansible_facts['selinux'] is defined
     - ansible_facts['selinux']['status'] == 'enabled'
-    - item.type == 'dir'
 
-# Immediately applies virt_image_t SELinux label to directory so KVM can write VM disk images
-- name: Apply SELinux context to storage pool directory contents
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    setype: virt_image_t
-    recurse: false
-    state: directory
-  loop: "{{ rhel_kvm_storage_pools }}"
-  when:
-    - ansible_facts['selinux'] is defined
-    - ansible_facts['selinux']['status'] == 'enabled'
-    - item.type == 'dir'
-
-# Defines libvirt storage pools (must be defined before they can be activated)
+# Defines the pools in libvirt (a pool must be defined before it can be started)
 - name: Ensure libvirt storage pools are defined
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
     state: present
-    xml: "{{ lookup('ansible.builtin.template', 'storage_pool.xml.j2') }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
+    xml: "<pool type='dir'><name>{{ item.name }}</name><target><path>{{ item.path }}</path></target></pool>"
   loop: "{{ rhel_kvm_storage_pools }}"
 
-# Activates the storage pools
+# Starts the pools
 - name: Activate libvirt storage pools
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
     state: active
-    uri: "{{ rhel_kvm_libvirt_uri }}"
   loop: "{{ rhel_kvm_storage_pools }}"
 
-# Sets autostart for the storage pools.
-# Split from the task above: community.libvirt.virt_pool returns as soon as it
-# handles `state`, so passing `autostart` in the same task is silently ignored
-# and the pool does not come back up on reboot. See:
-# https://github.com/ansible-collections/community.libvirt/blob/main/plugins/modules/virt_pool.py
+# Sets autostart. A separate task: community.libvirt.virt_pool returns as soon as it
+# handles `state`, so `autostart` in the same task is silently ignored and the pool
+# does not come back after a reboot.
 - name: Autostart libvirt storage pools
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
-    autostart: "{{ item.autostart | default(true) }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
+    autostart: true
   loop: "{{ rhel_kvm_storage_pools }}"

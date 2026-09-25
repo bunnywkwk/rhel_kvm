@@ -8,15 +8,37 @@ Errors quoted here were hit on the test hosts; the full stories are in the orche
 | # | File | Purpose |
 | :- | :--- | :--- |
 | 1 | `tasks/main.yml` | Loads the OS-specific vars, then runs the steps below in order |
-| 2 | `tasks/preflight.yml` | Checks OS + CPU, loads and persists kernel modules |
+| 2 | `tasks/preflight.yml` | Checks the OS, loads and persists kernel modules |
 | 3 | `tasks/packages.yml` | Installs the KVM/libvirt packages |
 | 4 | `tasks/sysctl.yml` | Turns on IP forwarding |
 | 5 | `tasks/daemons.yml` | Starts the right libvirt daemons for the OS |
 | 6 | `tasks/storage.yml` | Creates the VM disk directory, SELinux label, storage pool |
 | 7 | `tasks/networks.yml` | Creates the NAT network `kvm_br0` |
-| 8 | `tasks/users.yml` | Lets admin users manage VMs, sets the default `virsh` connection |
 
 Big idea: **one role, two libvirt designs.** RHEL 9 must run the single `libvirtd` daemon (a fixed requirement); RHEL 10 only has separate `virtqemud` / `virtnetworkd` / `virtstoraged` daemons. The role does not branch with `if`. It loads a vars file per OS, and every task loops over whatever that file defines.
+
+---
+
+## Where each variable is used
+
+Defaults are in `defaults/main.yml`; protected constants are in `vars/`. This is every place a variable is read, so nothing is hidden in `main.yml` or a template.
+
+| Variable | Read in | Effect |
+| :--- | :--- | :--- |
+| `rhel_kvm_manage_sysctl` | **`tasks/main.yml`** (gate on the `sysctl.yml` include) | `true`: IP forwarding step runs; `false`: skipped |
+| `rhel_kvm_packages` | `tasks/packages.yml` | mandatory packages |
+| `rhel_kvm_extra_packages` | `tasks/packages.yml` | optional extra packages (skipped when empty) |
+| `rhel_kvm_update_redhat_release` | `tasks/packages.yml` | `true` on RHEL 10: update `redhat-release` first |
+| `rhel_kvm_disabled_services` | `tasks/daemons.yml` | units stopped and masked (RHEL 10: the legacy `libvirtd` units; RHEL 9: none) |
+| `rhel_kvm_sockets` | `tasks/daemons.yml` | sockets enabled and started (RHEL 10: the modular sockets; RHEL 9: none) |
+| `rhel_kvm_services` | `tasks/daemons.yml` | services enabled and started |
+| `rhel_kvm_storage_pools` | `tasks/storage.yml` (all 5 tasks) | the pools to create: name and path |
+| `rhel_kvm_manage_bridge_network` | `tasks/networks.yml` (`when` on all 3 tasks) | `false`: no `kvm_br0` |
+| `rhel_kvm_bridge_network_name` | `tasks/networks.yml`, `templates/bridge_network.xml.j2` | network name |
+| `rhel_kvm_bridge_autostart` | `tasks/networks.yml` (autostart task) | start at boot |
+| `rhel_kvm_bridge_device`, `_ip`, `_netmask`, `_dhcp_start`, `_dhcp_end` | `templates/bridge_network.xml.j2` only | bridge name, address, DHCP range |
+
+Only `rhel_kvm_manage_sysctl` lives in `main.yml`. The OS facts (`os_family`, `distribution_major_version`) are also read there, to pick the vars file.
 
 ---
 
@@ -27,18 +49,18 @@ Big idea: **one role, two libvirt designs.** RHEL 9 must run the single `libvirt
   ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}-{{ ansible_facts['distribution_major_version'] }}.yml"
 ```
 - **What:** builds the file name from facts, e.g. `RedHat-9.yml` or `RedHat-10.yml`, and loads it.
-- **Why:** this is the only place the OS decision is made. The vars file decides which sockets/services to start, which to mask, which URI to use and whether to update `redhat-release`. Adding an OS later means adding a file, not editing tasks.
+- **Why:** this is the only place the OS decision is made. The vars file decides which sockets/services to start, which to mask and whether to update `redhat-release`. Adding an OS later means adding a file, not editing tasks.
 - **Error seen:** none.
 
 ```yaml
 - name: Run pre-flight hardware and OS validation
   ansible.builtin.include_tasks: preflight.yml
-# ... packages.yml, sysctl.yml, daemons.yml, storage.yml, networks.yml, users.yml
+# ... packages.yml, sysctl.yml, daemons.yml, storage.yml, networks.yml
 - name: Configure kernel sysctl parameters for KVM
   ansible.builtin.include_tasks: sysctl.yml
   when: rhel_kvm_manage_sysctl | bool
 ```
-- **What:** each step is a separate file pulled in with `include_tasks`. The sysctl step can be switched off with `rhel_kvm_manage_sysctl: false`.
+- **What:** each step is a separate file pulled in with `include_tasks`. `main.yml` contains **one** variable, `rhel_kvm_manage_sysctl`, which decides whether `sysctl.yml` runs. It also reads two facts (`os_family`, `distribution_major_version`) to pick the vars file.
 - **Why:** small files are easier to maintain and explain; the order matters (packages before daemons, daemons before storage/networks, because pools and networks need a running libvirt).
 - **Error seen:** none.
 
@@ -60,21 +82,18 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
 | Variable | Value | Why |
 | :--- | :--- | :--- |
 | `rhel_kvm_update_redhat_release` | `false` | RHEL 9 packages only carry the classic signature, no key update needed |
-| `rhel_kvm_libvirt_uri` | `qemu+unix:///system?socket=/var/run/libvirt/libvirt-sock` | every libvirt task and `virsh` connects straight to `libvirtd`'s own socket, so nothing depends on how the client chooses between `libvirtd` and the modular daemons |
-| `rhel_kvm_sockets` | `libvirtd.socket`, `-ro`, `-admin` | the sockets to enable/start |
+| `rhel_kvm_sockets` | `[]` | no sockets are managed on RHEL 9; enabling `libvirtd.service` is enough |
 | `rhel_kvm_services` | `libvirtd.service` | the service to enable/start |
-| `rhel_kvm_disabled_services` | all `virtqemud/virtnetworkd/virtstoraged/virtnodedevd/virtsecretd/virtnwfilterd` services and sockets | RHEL 9.8 ships both daemon families and its systemd presets start the modular ones on their own; they are stopped and masked so they can never run next to `libvirtd` |
+| `rhel_kvm_disabled_services` | `[]` | nothing is disabled or masked; the other libvirt daemons stay as the OS ships them |
 
-- **Error seen [#6]:** `libvirtd` was `inactive (dead)` while `virtqemud`, `virtnetworkd`, `virtstoraged` were `active (running)`.
-- **Error seen [#7]:** `Failed to connect socket to '/var/run/libvirt/virtqemud-sock': Connection refused` (fixed by the explicit URI).
+- **Error seen:** none.
 
 ### `vars/RedHat-10.yml` (modular)
 | Variable | Value | Why |
 | :--- | :--- | :--- |
 | `rhel_kvm_update_redhat_release` | `true` | RHEL 10.1+ packages are also signed with a post-quantum key that an older 10.1 image lacks; see `packages.yml` |
-| `rhel_kvm_libvirt_uri` | `qemu:///system` | `libvirtd` does not exist on RHEL 10, so the plain URI is unambiguous |
-| `rhel_kvm_sockets` | 6 drivers x (`socket`, `-ro`, `-admin`) | modular sockets for qemu, network, storage, nodedev, secret, nwfilter |
-| `rhel_kvm_services` | `virtqemud`, `virtnetworkd`, `virtstoraged` | started explicitly so networks, pools and VMs set to autostart really come up at boot |
+| `rhel_kvm_sockets` | 6 drivers x (`socket`, `-ro`, `-admin`) | sockets for qemu, network, storage, nodedev, secret and nwfilter. The OS does not enable them on a fresh host, and each daemon starts on demand |
+| `rhel_kvm_services` | `virtqemud.service` | runs the VMs |
 | `rhel_kvm_disabled_services` | the four `libvirtd` units | stopped and masked so the legacy daemon can never conflict |
 
 - **Error seen [#5]:** `Failed to validate GPG signature for libvirt-daemon-log-11.10.0-12.4.el10_2.x86_64: Public key for ...rpm is not installed`.
@@ -94,29 +113,6 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
 - **What:** stops the run with a clear message unless the host is RedHat-family 9 or 10.
 - **Why:** package names, daemon layout and paths differ elsewhere; failing early is better than half-configuring a wrong OS. It also guarantees a matching `vars/RedHat-N.yml` exists.
 - **Error seen:** none.
-
-```yaml
-- name: Check CPU hardware virtualization extensions support
-  ansible.builtin.shell:
-    cmd: "grep -E -c '(vmx|svm)' /proc/cpuinfo"
-  register: rhel_kvm_cpu_virt_check
-  changed_when: false
-  failed_when: false
-```
-- **What:** counts the CPU lines that list `vmx` (Intel) or `svm` (AMD). The result goes into `rhel_kvm_cpu_virt_check`.
-- **`changed_when: false`:** it only reads; it must not report a change.
-- **`failed_when: false`:** `grep -c` exits with code 1 when the count is 0. Without this, a CPU with no virtualization flags would abort the run instead of producing the warning below.
-- **Why:** KVM needs hardware virtualization. The role checks, but does not block, because a VM host may have nested virtualization off and still be usable (slowly) for testing.
-- **Error seen:** none.
-
-```yaml
-- name: Warn if CPU hardware virtualization is missing
-  ansible.builtin.debug:
-    msg: "WARNING: Hardware virtualization (VT-x/AMD-V) is not detected ..."
-  when: rhel_kvm_cpu_virt_check.stdout | int == 0
-```
-- **What:** prints the warning only when the count is 0.
-- **Why:** makes a slow or failing VM later easy to explain.
 
 ```yaml
 - name: Load required virtualization kernel modules
@@ -180,7 +176,7 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
   - `python3-libvirt`: the Python bindings **on the target**, required by the `community.libvirt` modules used in `storage.yml` and `networks.yml`.
 - **`state: present`:** install if missing, never upgrade what is already there (keeps runs repeatable).
 - **`update_cache: true`:** refresh repo metadata first so the newest builds are found.
-- **Error seen:** `Cannot find a valid baseurl for repo: epel` (a broken `epel.repo` stub left by the Zabbix role; dnf refreshes every enabled repo, not only the ones it needs) [#10].
+- **Error seen:** `Cannot find a valid baseurl for repo: epel` (a broken `epel.repo` stub left by the Zabbix role; dnf refreshes every enabled repo, not only the ones it needs) [#8].
 
 ```yaml
 - name: Install optional user-defined KVM packages
@@ -188,7 +184,6 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
     name: "{{ rhel_kvm_extra_packages }}"
     state: present
   when:
-    - rhel_kvm_extra_packages is defined
     - rhel_kvm_extra_packages | length > 0
 ```
 - **What:** installs anything the user lists in `rhel_kvm_extra_packages` (e.g. `guestfs-tools`); skipped when the list is empty.
@@ -234,7 +229,9 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
 
 ## 6. `tasks/daemons.yml`
 
-### 6.1 Stop and mask the daemons this OS must not run
+RHEL 9 keeps this simple: only `libvirtd.service` is enabled and started. No sockets are managed and nothing is masked. RHEL 10 uses the modular sockets and services and masks the legacy `libvirtd` units.
+
+### 6.1 Disable the daemons this OS does not use
 ```yaml
 - name: Disable conflicting services if applicable
   ansible.builtin.systemd_service:
@@ -246,33 +243,11 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
   failed_when: false
 ```
 - **What:** for each unit in `rhel_kvm_disabled_services`: disable it, stop it, **mask** it (a masked unit cannot be started by anything, not even another unit or a preset).
-- **Why:** RHEL 9: the modular daemons; RHEL 10: the legacy `libvirtd`. This is what enforces the monolithic requirement on RHEL 9.
-- **`failed_when: false`:** the list is written once for all hosts; a unit that is not installed on a given host (or is already stopped) must not abort the run.
-- **Error seen [#6]:** `libvirtd` inactive while `virtqemud`, `virtnetworkd`, `virtstoraged` were running.
+- **Why:** on RHEL 10 the legacy `libvirtd` units must never run; RHEL 10 has no `libvirtd`, so this is a safeguard. On RHEL 9 the list is empty and the task does nothing.
+- **`failed_when: false`:** the list is written once per OS; a unit that is not installed on a given host (or is already stopped) must not abort the run.
+- **Error seen:** none.
 
-### 6.2 Make sure the socket comes before the service
-```yaml
-- name: Check whether the primary libvirt socket is active
-  ansible.builtin.command:
-    argv: [systemctl, is-active, "{{ rhel_kvm_sockets | first }}"]
-  register: rhel_kvm_primary_socket
-  changed_when: false
-  failed_when: false
-
-- name: Stop libvirt services that are running without their socket
-  ansible.builtin.systemd_service:
-    name: "{{ item }}"
-    state: stopped
-  loop: "{{ rhel_kvm_services }}"
-  when: rhel_kvm_primary_socket.stdout != 'active'
-```
-- **What:** asks systemd whether the first socket is active (`is-active` exits non-zero when it is not, hence `failed_when: false`; `changed_when: false` because it only reads). If it is not active, the libvirt service is stopped first.
-- **Why:** on RHEL 9, after a reboot `libvirtd.service` started without `libvirtd.socket`. When the playbook then tried to start the socket, systemd refused ("already active"), and because the socket unit has `RemoveOnStop=yes`, the socket files in `/run/libvirt/` were deleted while the daemon kept running: every client got "No such file". Stopping the service first lets the socket bind cleanly; the next tasks start socket, then service.
-- **When it is skipped:** if the socket is already active (normal case, and RHEL 10), so re-runs stay `changed=0`. Stopping `libvirtd` does not stop running VMs.
-- **Error seen [#8]:** `Unable to start service libvirtd.socket: Job failed` (journal: `Socket service libvirtd.service already active, refusing`), then `Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory`.
-- **Tested:** rhel9 hardened, rebooted into the broken state, re-run `failed=0`.
-
-### 6.3 Enable and start the sockets
+### 6.2 Enable and start the sockets
 ```yaml
 - name: Enable and start libvirt systemd sockets
   ansible.builtin.systemd_service:
@@ -282,10 +257,9 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
   loop: "{{ rhel_kvm_sockets }}"
 ```
 - **What:** enable (start at boot) and start every socket in the OS list.
-- **Why:** socket activation: systemd listens on the socket and starts the daemon on the first connection. On RHEL 10 all 18 driver sockets are used.
-- **Note:** no `failed_when: false` here on purpose, so a real failure shows up.
+- **Why:** socket activation: systemd listens on the socket and starts the daemon on the first connection. On RHEL 10 these are the 18 driver sockets. On RHEL 9 the list is empty, so this task does nothing.
 
-### 6.4 Enable and start the services
+### 6.3 Enable and start the services
 ```yaml
 - name: Enable and start libvirt systemd services
   ansible.builtin.systemd_service:
@@ -295,27 +269,31 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
   loop: "{{ rhel_kvm_services }}"
   when: rhel_kvm_services | length > 0
 ```
-- **What:** enable and start `libvirtd` (RHEL 9) or the three modular daemons (RHEL 10).
-- **Why:** sockets alone would only start a daemon on the first connection. Networks, pools and VMs marked *autostart* need the daemon running at boot, so the service itself is enabled.
-- **Error seen:** none by itself; see 6.2 for the ordering problem.
+- **What:** enable and start `libvirtd` (RHEL 9) or `virtqemud` (RHEL 10).
+- **On RHEL 9 the socket list is empty** because `libvirtd.service` brings its own sockets: the unit file says `Also=` (enabling the service enables them) and `Wants=` (starting the service starts them). On RHEL 10 the sockets of all drivers are listed, because the OS does not enable them.
+- **Why:** sockets alone would only start a daemon on the first connection. VMs marked *autostart* need `virtqemud` running at boot, so the service itself is enabled.
+- **Error seen:** none.
 
 ---
 
 ## 7. `tasks/storage.yml`: the VM disk pool
 
+A pool is a directory where libvirt stores VM disks. It has a `name` and a `path`. Every task below loops over `rhel_kvm_storage_pools`.
+
 ```yaml
-- name: Ensure storage pool directories exist with correct permissions
+- name: Ensure storage pool directories exist with the VM image label
   ansible.builtin.file:
     path: "{{ item.path }}"
     state: directory
     owner: root
     group: root
     mode: "0711"
+    setype: virt_image_t
   loop: "{{ rhel_kvm_storage_pools }}"
-  when: item.type == 'dir'
 ```
-- **What:** creates the directory (default `/var/lib/libvirt/images`), owner `root:root`, mode `0711`, for every pool of type `dir`.
+- **What:** creates the directory (default `/var/lib/libvirt/images`), owner `root:root`, mode `0711`, and gives it the SELinux label `virt_image_t` right away. The label is ignored when SELinux is disabled.
 - **Why `0711`:** other users can pass through the directory (so QEMU can reach files inside) but cannot list or read it, so VM disk images are not readable by ordinary users.
+- **Why `virt_image_t`:** with SELinux enforcing, QEMU is only allowed to use files labelled `virt_image_t`.
 
 ```yaml
 - name: Set persistent SELinux context on storage directories
@@ -327,44 +305,26 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
   when:
     - ansible_facts['selinux'] is defined
     - ansible_facts['selinux']['status'] == 'enabled'
-    - item.type == 'dir'
 ```
 - **What:** records in the SELinux policy that this path and everything under it are `virt_image_t`. `(/.*)?` is the regex "the directory and anything below it". Skipped if SELinux is off.
-- **Why:** with SELinux enforcing, QEMU is only allowed to use files labelled `virt_image_t`. Recording it in the policy keeps the label after a relabel of the filesystem.
-
-```yaml
-- name: Apply SELinux context to storage pool directory contents
-  ansible.builtin.file:
-    path: "{{ item.path }}"
-    setype: virt_image_t
-    recurse: false
-    state: directory
-  loop: ...
-```
-- **What:** applies the label to the directory right now.
-- **Why:** `sefcontext` only writes the rule; this makes it effective immediately without running `restorecon`.
+- **Why:** the label set by the first task is lost if the filesystem is relabelled. Recording it in the policy keeps it.
 
 ```yaml
 - name: Ensure libvirt storage pools are defined
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
     state: present
-    xml: "{{ lookup('ansible.builtin.template', 'storage_pool.xml.j2') }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
+    xml: "<pool type='dir'><name>{{ item.name }}</name><target><path>{{ item.path }}</path></target></pool>"
   loop: "{{ rhel_kvm_storage_pools }}"
 ```
-- **What:** defines (registers) the pool in libvirt from the XML template.
-- **`uri:`** the per-OS connection string (section 2). This is what keeps RHEL 9 on `libvirtd`.
+- **What:** defines (registers) the pool in libvirt. The XML is one line: a directory pool with a name and a path. The mode and label are not repeated in it, because the first task already sets them on the directory.
 - **Why separate from "active":** a pool must exist before it can be started; the module cannot start something that is not defined.
-- **Error seen [#7]:** `Failed to connect socket to '/var/run/libvirt/virtqemud-sock': Connection refused` (the task's default URI reached the wrong daemon socket).
-- **Error seen [#8]:** `Failed to connect socket to '/var/run/libvirt/libvirt-sock': No such file or directory` (socket file deleted, see 6.2).
 
 ```yaml
 - name: Activate libvirt storage pools
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
     state: active
-    uri: "{{ rhel_kvm_libvirt_uri }}"
   loop: "{{ rhel_kvm_storage_pools }}"
 ```
 - **What:** starts the pool. **Why:** libvirt tools such as `virt-install` fail with "Storage pool not found/not active" otherwise.
@@ -373,11 +333,10 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
 - name: Autostart libvirt storage pools
   community.libvirt.virt_pool:
     name: "{{ item.name }}"
-    autostart: "{{ item.autostart | default(true) }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
+    autostart: true
   loop: "{{ rhel_kvm_storage_pools }}"
 ```
-- **What:** sets the pool to start automatically at boot.
+- **What:** sets the pool to start automatically at boot. Every pool autostarts.
 - **Why a separate task:** `community.libvirt.virt_pool` stops at `state` and silently ignores `autostart` when both are in one task, so the pool did not come back after a reboot.
 - **Error seen [#4]:** no Ansible error; the play passed, but after reboot the pool/network showed `inactive` and `Autostart: no`.
 
@@ -393,7 +352,6 @@ All three tasks run only when `rhel_kvm_manage_bridge_network` is true.
     name: "{{ rhel_kvm_bridge_network_name }}"
     state: present
     xml: "{{ lookup('ansible.builtin.template', 'bridge_network.xml.j2') }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
 ```
 - **What:** defines a virtual network named `kvm_br0` (bridge `virbr1`, `192.168.100.0/24`) from the template.
 - **Why:** a second, dedicated network for VMs, in addition to libvirt's built-in `default` network (`virbr0`, `192.168.122.0/24`), which the role leaves as shipped. The subnet does not overlap the default one.
@@ -403,13 +361,11 @@ All three tasks run only when `rhel_kvm_manage_bridge_network` is true.
   community.libvirt.virt_net:
     name: "{{ rhel_kvm_bridge_network_name }}"
     state: active
-    uri: "{{ rhel_kvm_libvirt_uri }}"
 
 - name: Autostart dedicated bridge network
   community.libvirt.virt_net:
     name: "{{ rhel_kvm_bridge_network_name }}"
     autostart: "{{ rhel_kvm_bridge_autostart | default(true) }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
 ```
 - **What:** start the network, then set autostart, as two tasks. **Why:** same reason as storage: `autostart` is ignored when combined with `state`.
 - **Error seen [#4]:** after a reboot `kvm_br0` was `inactive` with `Autostart: no` (`virsh net-list --all`), although the play had succeeded.
@@ -418,41 +374,7 @@ All three tasks run only when `rhel_kvm_manage_bridge_network` is true.
 
 ---
 
-## 9. `tasks/users.yml`
-
-```yaml
-- name: Add administrative users to libvirt group
-  ansible.builtin.user:
-    name: "{{ item }}"
-    groups: libvirt
-    append: true
-  loop: "{{ rhel_kvm_admin_users }}"
-  when:
-    - rhel_kvm_admin_users is defined
-    - rhel_kvm_admin_users | length > 0
-```
-- **What:** adds each listed user to the `libvirt` group. `append: true` adds to the group without removing the user from their other groups (without it, `groups:` would replace the whole list).
-- **Why:** libvirt ships a polkit rule that lets members of the `libvirt` group manage the system connection without a password, so `virsh`/Cockpit work without `sudo`. (The socket itself is world-connectable, mode `0666`; polkit is what authorizes the actions.)
-- **Where the user comes from:** the orchestrator sets `rhel_kvm_admin_users: ["{{ ansible_user }}"]` (`frqadmin`).
-
-```yaml
-- name: Configure system-wide default libvirt URI
-  ansible.builtin.copy:
-    dest: /etc/profile.d/libvirt.sh
-    content: |
-      export LIBVIRT_DEFAULT_URI="{{ rhel_kvm_libvirt_uri }}"
-    owner: root
-    group: root
-    mode: "0644"
-```
-- **What:** writes a login-shell script that exports `LIBVIRT_DEFAULT_URI` with the per-OS URI.
-- **Why:** an ordinary user's `virsh` otherwise connects to `qemu:///session` (the user's own empty instance), not the system hypervisor. Using the same variable as the tasks keeps `virsh` and Ansible on the same daemon.
-- **Limits:** only login shells read `/etc/profile.d`; `sudo virsh` does not inherit it.
-- **Error seen:** without the system URI, `virsh` as a normal user shows an empty list ([#9]).
-
----
-
-## 10. Supporting files
+## 9. Supporting files
 
 ### `handlers/main.yml`
 ```yaml
@@ -468,22 +390,13 @@ All three tasks run only when `rhel_kvm_manage_bridge_network` is true.
 | Variable | Default | Meaning |
 | :--- | :--- | :--- |
 | `rhel_kvm_manage_sysctl` | `true` | run `sysctl.yml` |
-| `rhel_kvm_admin_users` | `[]` | users added to the `libvirt` group |
 | `rhel_kvm_extra_packages` | `[]` | extra packages |
-| `rhel_kvm_storage_pools` | one `dir` pool `default` at `/var/lib/libvirt/images`, autostart | pool list |
+| `rhel_kvm_storage_pools` | one pool: `default` at `/var/lib/libvirt/images` | the pools to create |
 | `rhel_kvm_manage_bridge_network` | `true` | create `kvm_br0` |
 | `rhel_kvm_bridge_network_name` / `_device` | `kvm_br0` / `virbr1` | libvirt network name / Linux bridge name |
 | `rhel_kvm_bridge_ip` / `_netmask` | `192.168.100.1` / `255.255.255.0` | host address on the bridge |
 | `rhel_kvm_bridge_dhcp_start` / `_end` | `.10` / `.254` | DHCP range for guests |
 | `rhel_kvm_bridge_autostart` | `true` | start at boot |
-
-### `templates/storage_pool.xml.j2`
-| Line | Meaning |
-| :--- | :--- |
-| `<pool type='dir'>` | a directory-backed pool (type comes from the pool entry) |
-| `<name>` / `<path>` | pool name and directory |
-| `<mode>0711</mode>`, `<owner>0</owner>`, `<group>0</group>` | same permissions as the directory task, root-owned |
-| `<label>system_u:object_r:virt_image_t:s0</label>` | SELinux label libvirt applies to the pool directory |
 
 ### `templates/bridge_network.xml.j2`
 | Line | Meaning |
@@ -503,7 +416,5 @@ Galaxy metadata (author, platforms EL 9/10, `min_ansible_version` 2.15) and the 
 These are honest weak spots, not errors:
 1. **IPv6 forwarding task:** the `kvm_br0` network is IPv4-only, so this task has no consumer in the role today.
 2. **`Reload sysctl` handler:** the sysctl module already applies and reloads (`sysctl_set`, `reload`). The handler adds the ordered `sysctl --system` pass; it is belt-and-braces rather than strictly required.
-3. **Redundant guards:** `is defined` checks in `packages.yml` and `users.yml`, and `| default(true)` on the autostart values, are unnecessary because the defaults always exist.
-4. **Client URI behaviour:** it was seen once that the libvirt client reached `virtqemud-sock` on RHEL 9 while `libvirtd` was the enabled daemon. Later, on a rebooted host with the modular units masked, a plain `virsh` did connect. The exact rule the client uses to choose is not fully pinned down. The explicit URI removes the guesswork either way.
-5. **`libvirtd.socket` not started at boot on RHEL 9:** seen on two boots and not explained. `daemons.yml` converges it on the next run, and the service works in the meantime.
-6. **RHEL 10 `redhat-release` update:** confirmed by testing, not fully explained.
+3. **Redundant defaults:** `| default(true)` on the autostart values and `| default([])` on the loop in `daemons.yml` are unnecessary, because those variables always exist in `defaults/` or `vars/`.
+4. **RHEL 10 `redhat-release` update:** confirmed by testing, not fully explained.

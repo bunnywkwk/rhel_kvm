@@ -6,12 +6,12 @@
 # (see tasks/packages.yml).
 rhel_kvm_update_redhat_release: true
 
-# Bare qemu:///system already resolves to the modular sockets here (libvirtd
-# doesn't exist on RHEL 10), so no explicit socket path is needed like on
-# RHEL 9's rhel_kvm_libvirt_uri.
-rhel_kvm_libvirt_uri: "qemu:///system"
+# virtqemud.service runs the VMs and brings its own sockets (BindsTo, Wants and Also in the unit file).
+rhel_kvm_services:
+  - virtqemud.service
 
-# Modular driver systemd sockets to enabled and start
+# Sockets of every driver. The OS does not enable them on a fresh host (the first run reports them
+# as changed), and each daemon starts on demand when its socket is used.
 rhel_kvm_sockets:
   - virtqemud.socket
   - virtqemud-ro.socket
@@ -31,12 +31,6 @@ rhel_kvm_sockets:
   - virtnwfilterd.socket
   - virtnwfilterd-ro.socket
   - virtnwfilterd-admin.socket
-
-# Modular services MUST be enabled for autostart features (VMs, Networks, Pools) to work on boot
-rhel_kvm_services:
-  - virtqemud.service
-  - virtnetworkd.service
-  - virtstoraged.service
 
 # Ensure legacy monolithic service does not conflict
 rhel_kvm_disabled_services:

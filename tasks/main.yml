@@ -29,8 +29,3 @@
 # Step 7: Starts and autostarts the default internal virtual switch (virbr0)
 - name: Configure KVM virtual networks
   ansible.builtin.include_tasks: networks.yml
-
-# Step 8: Grants non-root users permission to manage VMs and sets default system URI
-- name: Configure administrative user access
-  ansible.builtin.include_tasks: users.yml
-

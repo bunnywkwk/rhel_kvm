@@ -7,7 +7,6 @@
     name: "{{ rhel_kvm_bridge_network_name }}"
     state: present
     xml: "{{ lookup('ansible.builtin.template', 'bridge_network.xml.j2') }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
   when: rhel_kvm_manage_bridge_network | bool
 
 # Activates the dedicated bridge network
@@ -15,7 +14,6 @@
   community.libvirt.virt_net:
     name: "{{ rhel_kvm_bridge_network_name }}"
     state: active
-    uri: "{{ rhel_kvm_libvirt_uri }}"
   when: rhel_kvm_manage_bridge_network | bool
 
 # Sets autostart for the dedicated bridge network.
@@ -27,5 +25,4 @@
   community.libvirt.virt_net:
     name: "{{ rhel_kvm_bridge_network_name }}"
     autostart: "{{ rhel_kvm_bridge_autostart | default(true) }}"
-    uri: "{{ rhel_kvm_libvirt_uri }}"
   when: rhel_kvm_manage_bridge_network | bool

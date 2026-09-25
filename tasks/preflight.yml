@@ -1,5 +1,5 @@
 ---
-# Pre-flight Checks & Kernel Module Configuration
+# Pre-flight Check & Kernel Module Configuration
 
 # Validates that the target OS is specifically RedHat/EL major version 9 or 10
 - name: Validate target operating system family
@@ -9,20 +9,6 @@
       - ansible_facts['distribution_major_version'] in ['9', '10']
     fail_msg: "This role only supports RedHat / RHEL 9 and 10. Detected: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
     success_msg: "Target OS validated: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
-
-# Scans /proc/cpuinfo to check if Intel (vmx) or AMD (svm) hardware virtualization is present
-- name: Check CPU hardware virtualization extensions support
-  ansible.builtin.shell:
-    cmd: "grep -E -c '(vmx|svm)' /proc/cpuinfo"
-  register: rhel_kvm_cpu_virt_check
-  changed_when: false
-  failed_when: false
-
-# Displays a warning if hardware virtualization is missing (e.g., nested virt disabled in hypervisor)
-- name: Warn if CPU hardware virtualization is missing
-  ansible.builtin.debug:
-    msg: "WARNING: Hardware virtualization (VT-x/AMD-V) is not detected in /proc/cpuinfo. KVM acceleration may fail unless running in software emulation."
-  when: rhel_kvm_cpu_virt_check.stdout | int == 0
 
 # Loads core virtualization kernel modules (kvm, vhost_net packet accelerator, and tun driver) into the running kernel
 - name: Load required virtualization kernel modules
