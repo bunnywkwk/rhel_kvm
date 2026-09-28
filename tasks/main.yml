@@ -5,7 +5,7 @@
 - name: Include OS-specific variables
   ansible.builtin.include_vars: "{{ ansible_facts['os_family'] }}-{{ ansible_facts['distribution_major_version'] }}.yml"
 
-# Step 2: Validates OS, checks CPU hardware virtualization flags, and loads kernel modules
+# Step 2: Validates OS, then loads kernel modules
 - name: Run pre-flight hardware and OS validation
   ansible.builtin.include_tasks: preflight.yml
 
@@ -16,7 +16,6 @@
 # Step 4: Configures net.ipv4.ip_forward in sysctl so VMs on NAT networks (the built-in default network) can reach outside
 - name: Configure kernel sysctl parameters for KVM
   ansible.builtin.include_tasks: sysctl.yml
-  when: rhel_kvm_manage_sysctl | bool
 
 # Step 5: Activates monolithic daemons on RHEL 9 or modular socket units on RHEL 10
 - name: Configure libvirt daemons and socket activation

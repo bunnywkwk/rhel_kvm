@@ -6,6 +6,7 @@ The role adapts to the underlying operating system version, managing **monolithi
 
 Task-by-task explanation (what each task does and why it exists): [docs/TASK_WALKTHROUGH.md](docs/TASK_WALKTHROUGH.md).
 Short answers to common questions about the code: [docs/FAQ.md](docs/FAQ.md).
+Questions to expect when presenting, with simple answers: [docs/DEFENSE_QA.md](docs/DEFENSE_QA.md).
 Architectural justifications and folder structure: [docs/ARCHITECTURE_AND_JUSTIFICATIONS.md](docs/ARCHITECTURE_AND_JUSTIFICATIONS.md).
 
 ---
@@ -49,7 +50,6 @@ Overridable defaults are in [defaults/main.yml](defaults/main.yml):
 
 | Variable                         | Default         | Description                                                                  |
 | :------------------------------- | :-------------- | :--------------------------------------------------------------------------- |
-| `rhel_kvm_manage_sysctl`         | `true`          | Configures `net.ipv4.ip_forward = 1` in `/etc/sysctl.d/99-kvm.conf`.         |
 | `rhel_kvm_extra_packages`        | `[]`            | Optional extra packages installed alongside the core hypervisor packages.    |
 | `rhel_kvm_storage_pools`         | _(list)_        | Storage pools to create (default: `default` at `/var/lib/libvirt/images`).   |
 | `rhel_kvm_manage_bridge_network` | `true`          | Whether to provision the dedicated hypervisor bridge network.                |

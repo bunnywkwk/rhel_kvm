@@ -25,7 +25,6 @@ Defaults are in `defaults/main.yml`; protected constants are in `vars/`. This is
 
 | Variable | Read in | Effect |
 | :--- | :--- | :--- |
-| `rhel_kvm_manage_sysctl` | **`tasks/main.yml`** (gate on the `sysctl.yml` include) | `true`: IP forwarding step runs; `false`: skipped |
 | `rhel_kvm_packages` | `tasks/packages.yml` | mandatory packages |
 | `rhel_kvm_extra_packages` | `tasks/packages.yml` | optional extra packages (skipped when empty) |
 | `rhel_kvm_update_redhat_release` | `tasks/packages.yml` | `true` on RHEL 10: update `redhat-release` first |
@@ -38,7 +37,7 @@ Defaults are in `defaults/main.yml`; protected constants are in `vars/`. This is
 | `rhel_kvm_bridge_autostart` | `tasks/networks.yml` (autostart task) | start at boot |
 | `rhel_kvm_bridge_device`, `_ip`, `_netmask`, `_dhcp_start`, `_dhcp_end` | `templates/bridge_network.xml.j2` only | bridge name, address, DHCP range |
 
-Only `rhel_kvm_manage_sysctl` lives in `main.yml`. The OS facts (`os_family`, `distribution_major_version`) are also read there, to pick the vars file.
+`main.yml` reads no variables of its own. The OS facts (`os_family`, `distribution_major_version`) decide which vars file to load.
 
 ---
 
@@ -56,11 +55,8 @@ Only `rhel_kvm_manage_sysctl` lives in `main.yml`. The OS facts (`os_family`, `d
 - name: Run pre-flight hardware and OS validation
   ansible.builtin.include_tasks: preflight.yml
 # ... packages.yml, sysctl.yml, daemons.yml, storage.yml, networks.yml
-- name: Configure kernel sysctl parameters for KVM
-  ansible.builtin.include_tasks: sysctl.yml
-  when: rhel_kvm_manage_sysctl | bool
 ```
-- **What:** each step is a separate file pulled in with `include_tasks`. `main.yml` contains **one** variable, `rhel_kvm_manage_sysctl`, which decides whether `sysctl.yml` runs. It also reads two facts (`os_family`, `distribution_major_version`) to pick the vars file.
+- **What:** each step is a separate file pulled in with `include_tasks`, always run in this order. `main.yml` itself has no `when:` conditions; it only reads two facts (`os_family`, `distribution_major_version`) to pick the vars file.
 - **Why:** small files are easier to maintain and explain; the order matters (packages before daemons, daemons before storage/networks, because pools and networks need a running libvirt).
 - **Error seen:** none.
 
@@ -391,7 +387,6 @@ All three tasks run only when `rhel_kvm_manage_bridge_network` is true.
 ### `defaults/main.yml` (what users may override)
 | Variable | Default | Meaning |
 | :--- | :--- | :--- |
-| `rhel_kvm_manage_sysctl` | `true` | run `sysctl.yml` |
 | `rhel_kvm_extra_packages` | `[]` | extra packages |
 | `rhel_kvm_storage_pools` | one pool: `default` at `/var/lib/libvirt/images` | the pools to create |
 | `rhel_kvm_manage_bridge_network` | `true` | create `kvm_br0` |

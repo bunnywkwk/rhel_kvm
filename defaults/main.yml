@@ -1,9 +1,6 @@
 ---
 # RHEL KVM DEFAULT VARIABLES
 
-# Manage kernel sysctl parameters (net.ipv4.ip_forward)
-rhel_kvm_manage_sysctl: true
-
 # Users can add custom tools here (e.g. guestfs-tools) without replacing core binaries
 rhel_kvm_extra_packages: []
 

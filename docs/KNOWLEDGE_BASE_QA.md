@@ -176,8 +176,8 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
     - Have 300–500 static compliance rules.
     - **Require `import_tasks`** so that `--tags rule_1.1.1` and `--skip-tags` work from the CLI, `--list-tasks` outputs the complete auditor rule inventory, and `--start-at-task` can resume failed runs.
   - **`rhel_kvm` Provisioning Role**:
-    - Has an 8-step sequential infrastructure pipeline.
-    - **Uses `include_tasks`** because features like `sysctl.yml` are conditionally toggled (`when: rhel_kvm_manage_sysctl | bool`). `include_tasks` allows skipping entire disabled feature files in 1 quick step at runtime instead of outputting 10 noisy skipped task lines.
+    - Has a 7-step sequential infrastructure pipeline.
+    - **Uses `include_tasks`** because some features are conditionally toggled, for example `when: rhel_kvm_manage_bridge_network | bool` inside `networks.yml`. `include_tasks` allows skipping a disabled feature's tasks in 1 quick step at runtime instead of outputting several noisy skipped task lines.
 
 ---
 
@@ -185,7 +185,7 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 
 - **A**:
   1. **Runtime "Lazy Loading"**: It is evaluated only when execution reaches that line, ensuring it uses the freshest runtime facts and registered variables.
-  2. **Single-Step Feature Skipping**: When a condition like `when: rhel_kvm_manage_sysctl | bool` is `false`, Ansible evaluates it once on the `include_tasks` statement and skips the whole file in 1 millisecond.
+  2. **Single-Step Feature Skipping**: When a condition like `when: rhel_kvm_manage_bridge_network | bool` is `false`, Ansible evaluates it once per task and skips that task, instead of the whole file needing its own individual `when:` copied onto every line.
   3. **Clean Execution Logs**: Keeps the terminal output concise and professional for infrastructure provisioning.
 
 ---
