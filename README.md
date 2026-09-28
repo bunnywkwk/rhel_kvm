@@ -22,7 +22,7 @@ Architectural justifications and folder structure: [docs/ARCHITECTURE_AND_JUSTIF
 
 Default CIS hardening profiles often conflict with virtualization hypervisors. This role addresses that proactively:
 
-- **Kernel IP forwarding**: `net.ipv4.ip_forward = 1` persists in `/etc/sysctl.d/99-kvm.conf`, so VMs on NAT bridges can route external traffic. The `99-` prefix sorts after CIS's `60-*.conf`, so it wins when `sysctl --system` runs.
+- **Kernel IP forwarding**: `net.ipv4.ip_forward = 1` persists in `/etc/sysctl.d/99-kvm.conf`, so VMs on NAT networks (the built-in `default` network) can reach external networks. The `99-` prefix sorts after CIS's `60-*.conf`, so it wins when `sysctl --system` runs.
 - **SELinux enforcement**: `virt_image_t` is applied to every storage pool directory so SELinux in `Enforcing` mode allows VM disk I/O.
 - **Kernel modules**: `kvm`, `vhost_net` (in-kernel packet acceleration) and `tun` (virtual network driver) are loaded and persisted.
 

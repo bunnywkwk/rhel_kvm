@@ -50,7 +50,7 @@ Provision a bare RHEL 9 or RHEL 10 server into a production-grade KVM Hypervisor
 | **`tasks/main.yml`** | Master table of contents; dynamically loads OS variables and calls each subtask file in strict order. |
 | **`tasks/preflight.yml`** | Checks the OS, loads `kvm`/`tun`/`vhost_net` kernel modules, and configures nested virtualization. |
 | **`tasks/packages.yml`** | Installs `qemu-kvm`, `libvirt`, `virt-install`, and management tools via `dnf`. |
-| **`tasks/sysctl.yml`** | Enables `net.ipv4.ip_forward = 1` so Linux routes traffic between the virtual switch and the outside internet. |
+| **`tasks/sysctl.yml`** | Enables `net.ipv4.ip_forward = 1` so Linux routes traffic between the built-in `default` NAT network and the outside. |
 | **`tasks/daemons.yml`** | Starts `libvirtd.service` on RHEL 9; starts the driver sockets and `virtqemud.service` on RHEL 10. |
 | **`tasks/storage.yml`** | Creates storage directories (`/var/lib/libvirt/images`), sets SELinux `virt_image_t` context, and starts disk pools. |
 | **`tasks/networks.yml`** | Starts and autostarts the default internal virtual switch (`virbr0`). |

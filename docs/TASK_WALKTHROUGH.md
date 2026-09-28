@@ -13,7 +13,7 @@ Errors quoted here were hit on the test hosts; the full stories are in the orche
 | 4 | `tasks/sysctl.yml` | Turns on IP forwarding |
 | 5 | `tasks/daemons.yml` | Starts the right libvirt daemons for the OS |
 | 6 | `tasks/storage.yml` | Creates the VM disk directory, SELinux label, storage pool |
-| 7 | `tasks/networks.yml` | Creates the NAT network `kvm_br0` |
+| 7 | `tasks/networks.yml` | Creates the isolated network `kvm_br0` |
 
 Big idea: **one role, two libvirt designs.** RHEL 9 must run the single `libvirtd` daemon (a fixed requirement); RHEL 10 only has separate `virtqemud` / `virtnetworkd` / `virtstoraged` daemons. The role does not branch with `if`. It loads a vars file per OS, and every task loops over whatever that file defines.
 
@@ -209,7 +209,7 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
   - `sysctl_set: true`: also applied to the running kernel now.
   - `reload: true`: reloads sysctl settings after the change.
   - `notify: Reload sysctl`: runs `sysctl --system` (handler) only when something changed.
-- **Why:** the `kvm_br0` network is NAT (`forward mode='nat'`); NAT only works if the host forwards packets between the VM bridge and the real network.
+- **Why:** a NAT network only works if the host forwards packets between the VM bridge and the real network. The built-in `default` network is NAT, so it needs this. `kvm_br0` is isolated and does not. libvirt turns forwarding on itself when it starts a NAT network, but the CIS roles write `ip_forward = 0` and reload sysctl afterwards; `99-kvm.conf` sets it back to `1` in a file read later.
 - **Why file `99-`:** files in `/etc/sysctl.d/` are read in name order and the last value wins. The CIS roles write `ip_forward = 0` into `60-netipv4_sysctl.conf`; `99-kvm.conf` loads after it and overrides it, so hardening does not break VM networking. Checked on both hardened hosts: `sysctl net.ipv4.ip_forward` = `1`.
 - **Error seen:** none. It is a conflict avoided by design [#2].
 
@@ -222,7 +222,7 @@ rhel_kvm_packages: [qemu-kvm, libvirt, libvirt-client, virt-install, python3-lib
   when: ansible_facts['all_ipv6_addresses'] is defined and ansible_facts['all_ipv6_addresses'] | length > 0
 ```
 - **What:** the same for IPv6, only if the host has an IPv6 address.
-- **Why:** forwarding for guests that use IPv6. See "Review notes": the NAT network in this role is IPv4 only.
+- **Why:** forwarding for guests that use IPv6. See "Review notes": the `kvm_br0` network in this role is IPv4 only.
 - **Error seen:** none.
 
 ---
@@ -342,9 +342,11 @@ A pool is a directory where libvirt stores VM disks. It has a `name` and a `path
 
 ---
 
-## 8. `tasks/networks.yml`: the NAT network `kvm_br0`
+## 8. `tasks/networks.yml`: the isolated network `kvm_br0`
 
 All three tasks run only when `rhel_kvm_manage_bridge_network` is true.
+
+`kvm_br0` is an **isolated** network: no NAT and no route out. VMs on it can talk to each other and to the host (which has `192.168.100.1` on the bridge), and libvirt's `dnsmasq` still hands them addresses from the DHCP range. Internet access for a VM comes from the built-in `default` network (NAT); a VM that needs both gets two NICs.
 
 ```yaml
 - name: Ensure dedicated bridge network is defined
@@ -401,7 +403,7 @@ All three tasks run only when `rhel_kvm_manage_bridge_network` is true.
 ### `templates/bridge_network.xml.j2`
 | Line | Meaning |
 | :--- | :--- |
-| `<forward mode='nat'/>` | guests reach outside networks through the host (needs IP forwarding) |
+| _(no `<forward>` line)_ | the network is isolated: VMs on it reach each other and the host, but not the outside. A VM that needs internet also gets a NIC on `default` (NAT) |
 | `<bridge name='virbr1' stp='on' delay='0'/>` | Linux bridge for the network; spanning tree on, no forward delay |
 | `<ip address=... netmask=...>` | the host's address on the bridge, and the guests' gateway |
 | `<dhcp><range start end/>` | libvirt's `dnsmasq` hands out addresses in this range |

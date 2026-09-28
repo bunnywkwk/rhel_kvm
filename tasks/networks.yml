@@ -1,5 +1,6 @@
 ---
 # Dedicated Hypervisor Bridge Network Configuration
+# An isolated network (no NAT): VMs on it reach each other and the host, not the outside.
 
 # Defines the dedicated bridge network (must be defined before it can be activated)
 - name: Ensure dedicated bridge network is defined

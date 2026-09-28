@@ -246,11 +246,11 @@ The very first task in `tasks/main.yml` dynamically points to the matching file 
 
 ---
 
-### Q14: Why is the dedicated bridge approach (`kvm_br0` / `virbr1`) beneficial over default NAT?
+### Q14: Why is the dedicated bridge approach (`kvm_br0` / `virbr1`) beneficial next to default NAT?
 
 - **A**:
   1. **Inter-VM Layer 2 Switching**: Guest VMs attached to `kvm_br0` communicate directly with each other at kernel memory speeds without traversing external routers, ideal for multi-tier applications and clustering.
-  2. **VM-to-Host Gateway**: The KVM host interface at `192.168.100.1` acts as a direct management gateway and router for all guest VMs.
+  2. **VM-to-Host Access**: The KVM host has `192.168.100.1` on the bridge, so all guest VMs on `kvm_br0` can reach the host directly. The network is isolated (no NAT); internet access comes from the `default` network.
   3. **Zero Remote Connection Risk**: Using a dedicated virtual bridge device (`virbr1`) avoids modifying the host's physical network adapter (`enp1s0`), preventing accidental SSH disconnects during automation runs.
   4. **Proxmox Compatibility**: Avoids needing Promiscuous Mode or MAC Spoofing configured on Proxmox virtual network interfaces.
 

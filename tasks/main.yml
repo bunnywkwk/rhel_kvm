@@ -13,7 +13,7 @@
 - name: Install KVM and virtualization packages
   ansible.builtin.include_tasks: packages.yml
 
-# Step 4: Configures net.ipv4.ip_forward in sysctl so VMs can route network packets
+# Step 4: Configures net.ipv4.ip_forward in sysctl so VMs on NAT networks (the built-in default network) can reach outside
 - name: Configure kernel sysctl parameters for KVM
   ansible.builtin.include_tasks: sysctl.yml
   when: rhel_kvm_manage_sysctl | bool
@@ -26,6 +26,6 @@
 - name: Configure KVM storage pools
   ansible.builtin.include_tasks: storage.yml
 
-# Step 7: Starts and autostarts the default internal virtual switch (virbr0)
+# Step 7: Creates, starts and autostarts the isolated bridge network kvm_br0
 - name: Configure KVM virtual networks
   ansible.builtin.include_tasks: networks.yml

@@ -1,7 +1,7 @@
 ---
 # Sysctl & IP Forwarding Configuration
 
-# Enables IPv4 packet routing in the Linux kernel so VMs can access external networks via NAT
+# Enables IPv4 packet routing in the Linux kernel so VMs on NAT networks (such as the built-in default network) can reach external networks
 - name: Enable IPv4 packet forwarding for virtual networking
   ansible.posix.sysctl:
     name: net.ipv4.ip_forward

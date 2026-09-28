@@ -147,7 +147,7 @@ In standard Ansible roles, placing the package list in `defaults/main.yml` expos
 - **What it does**:
   1. Leaves the built-in `default` network (`virbr0`) intact as provided natively by the libvirt package.
   2. Idempotently defines and starts a dedicated virtual bridge network (`kvm_br0` on device `virbr1`) using `templates/bridge_network.xml.j2`.
-  3. Configures an isolated IP subnet (`192.168.100.0/24`) with gateway `192.168.100.1` and automated DHCP range (`192.168.100.10` - `192.168.100.254`).
+  3. Configures an isolated IP subnet (`192.168.100.0/24`) with the host at `192.168.100.1` and an automated DHCP range (`192.168.100.10` - `192.168.100.254`). The network has no NAT and no route out; VMs that need internet also use the built-in `default` network.
   4. Enables automatic startup on boot (`autostart: true`) in its own task, because `virt_net` ignores `autostart` when it is combined with `state` (see `docs/LESSONS_LEARNED_AND_FIXES.md` item #4).
 - **Justification**:
   - **Eliminating Redundancy**: The default network is already created by RPM installation. Removing redundant tasks that re-query and manipulate `default` keeps the role clean and unbloated.

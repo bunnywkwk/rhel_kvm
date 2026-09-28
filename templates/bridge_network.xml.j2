@@ -1,6 +1,5 @@
 <network>
   <name>{{ rhel_kvm_bridge_network_name }}</name>
-  <forward mode='nat'/>
   <bridge name='{{ rhel_kvm_bridge_device }}' stp='on' delay='0'/>
   <ip address='{{ rhel_kvm_bridge_ip }}' netmask='{{ rhel_kvm_bridge_netmask }}'>
     <dhcp>
