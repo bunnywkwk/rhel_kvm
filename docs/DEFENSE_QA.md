@@ -12,6 +12,9 @@ Everything after this depends on a matching vars file existing and on the right 
 **Why load `kvm`, `vhost_net` and `tun`?**
 A hypervisor needs the kernel's virtualization support (`kvm`), fast VM networking (`vhost_net`), and virtual network interfaces (`tun`) before it creates any pool, network or VM.
 
+**Who actually uses these — `libvirt`, or the packages?**
+`qemu-kvm` — specifically the process that runs each VM (`qemu-system-x86_64`). `libvirt` only manages *when* a VM starts and *with what settings*; it doesn't touch these devices itself. Checked directly: the QEMU binary references `/dev/kvm`, `/dev/net/tun` and `/dev/vhost-net`; none of the `libvirtd`/`virtqemud`/`virtnetworkd` daemon binaries reference any of them. These modules have to exist in the kernel *before* the first VM starts, because QEMU can only open devices the kernel already offers — it can't create them itself. That's why the task is in preflight, ahead of anything else.
+
 **`kvm` and `tun` show "ok" (no change) on the very first run — why, if we never loaded them?**
 They're already loaded before Ansible runs. `kvm` auto-loads because the kernel checks the CPU at boot and loads the matching module (Intel VT-x / AMD-V) by itself. `tun` auto-loads because a default udev rule touches `/dev/net/tun` at every boot, and just touching that device is enough to trigger the load — no VM has to exist yet.
 

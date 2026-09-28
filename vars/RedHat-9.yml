@@ -14,4 +14,6 @@ rhel_kvm_services:
   - libvirtd.service
 
 # Nothing is disabled or masked on RHEL 9: the other libvirt daemons stay as the OS ships them.
-rhel_kvm_disabled_services: []
+rhel_kvm_disabled_services:
+  - virtqemud.socket
+  - virtqemud.service
